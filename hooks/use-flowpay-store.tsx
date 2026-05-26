@@ -146,8 +146,8 @@ export function FlowPayStoreProvider({
 
   useEffect(() => {
     const storedTransactionTypePresets = window.localStorage.getItem(transactionTypePresetsStorageKey);
-    const storedTransactions = window.localStorage.getItem(transactionsStorageKey);
-    const storedInstallments = window.localStorage.getItem(installmentsStorageKey);
+    const storedTransactions = mode === "demo" ? window.localStorage.getItem(transactionsStorageKey) : null;
+    const storedInstallments = mode === "demo" ? window.localStorage.getItem(installmentsStorageKey) : null;
 
     try {
       if (storedTransactionTypePresets) {
