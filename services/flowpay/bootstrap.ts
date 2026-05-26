@@ -1,4 +1,4 @@
-import { categories, currentCycle, installments, transactions, users } from "@/data/mock";
+import { categories, currentCycle, installments, transactionTypePresets, transactions, users } from "@/data/mock";
 import { FlowPayRepository } from "@/repositories/flowpay-repository";
 import { getAppMode } from "@/services/flowpay/app-mode";
 import { defaultCarryOverAmount, defaultFoodBudgetTarget, householdPayrollDay } from "@/services/flowpay/config";
@@ -138,7 +138,8 @@ export async function getFlowPayBootstrap(): Promise<FlowPayBootstrap> {
       currentCycle,
       transactions,
       installments,
-      categories
+      categories,
+      transactionTypePresets
     };
   }
 
@@ -162,7 +163,8 @@ export async function getFlowPayBootstrap(): Promise<FlowPayBootstrap> {
         currentCycle,
         transactions,
         installments,
-        categories
+        categories,
+        transactionTypePresets
       };
     }
 
@@ -174,7 +176,8 @@ export async function getFlowPayBootstrap(): Promise<FlowPayBootstrap> {
       currentCycle: cycle,
       transactions: cycleTransactions,
       installments: installmentRows,
-      categories: categoryRows
+      categories: categoryRows,
+      transactionTypePresets
     };
   } catch (error) {
     console.error("FlowPay bootstrap fallback to demo mode", error);
@@ -185,7 +188,8 @@ export async function getFlowPayBootstrap(): Promise<FlowPayBootstrap> {
       currentCycle,
       transactions,
       installments,
-      categories
+      categories,
+      transactionTypePresets
     };
   }
 }

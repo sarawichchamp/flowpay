@@ -1,4 +1,4 @@
-import type { BillingCycle, Category, Installment, Profile, Transaction } from "@/types/domain";
+import type { BillingCycle, Category, Installment, Profile, Transaction, TransactionTypePreset } from "@/types/domain";
 import { getBillingCycleFromPayrollDate } from "@/utils/billing-cycle";
 
 export const demoToday = new Date("2026-05-24T00:00:00.000Z");
@@ -37,6 +37,11 @@ export const categories: Category[] = [
   { id: "health", name: "Health", icon: "HeartPulse", color: "#ef4444", isDefault: true },
   { id: "investment", name: "Investment", icon: "TrendingUp", color: "#22c55e", isDefault: true },
   { id: "other", name: "Other", icon: "CircleEllipsis", color: "#64748b", isDefault: true }
+];
+
+export const transactionTypePresets: TransactionTypePreset[] = [
+  { id: "preset-food", label: "Food", baseType: "food" },
+  { id: "preset-normal", label: "Expense", baseType: "normal" }
 ];
 
 export const transactions: Transaction[] = [

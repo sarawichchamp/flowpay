@@ -1,4 +1,4 @@
-import type { BillingCycle, Category, Installment, Profile, Transaction } from "@/types/domain";
+import type { BillingCycle, Category, Installment, Profile, Transaction, TransactionTypePreset } from "@/types/domain";
 
 export interface FlowPayBootstrap {
   mode: "demo" | "production";
@@ -7,4 +7,5 @@ export interface FlowPayBootstrap {
   transactions: Transaction[];
   installments: Installment[];
   categories: Category[];
+  transactionTypePresets: TransactionTypePreset[];
 }

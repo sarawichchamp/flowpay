@@ -2,6 +2,8 @@ export type CurrencyCode = "THB";
 
 export type TransactionType = "food" | "normal" | "installment";
 
+export type TransactionTypePresetBaseType = Exclude<TransactionType, "installment">;
+
 export type SplitType = "split_half" | "no_split" | "full_reimburse";
 
 export type Locale = "en" | "th";
@@ -30,6 +32,12 @@ export interface Category {
   color: string;
   isDefault: boolean;
   createdByUserId?: string | null;
+}
+
+export interface TransactionTypePreset {
+  id: string;
+  label: string;
+  baseType: TransactionTypePresetBaseType;
 }
 
 export interface Transaction {

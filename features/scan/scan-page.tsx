@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useFlowPayStore } from "@/hooks/use-flowpay-store";
 import { useLocale } from "@/hooks/use-locale";
 import { type ReceiptOcrField, runReceiptOcr, type ReceiptOcrDocumentType, type ReceiptOcrLineItem } from "@/services/ocr/receipt-ocr";
-import type { SplitType, TransactionType } from "@/types/domain";
+import type { SplitType, TransactionType, TransactionTypePreset } from "@/types/domain";
 import { getCategoryLabel, resolveCategoryId } from "@/utils/categories";
 import { formatTHB } from "@/utils/currency";
 import { receiptFileSchema } from "@/utils/validation";
@@ -30,6 +30,7 @@ type ReviewDraft = {
   title: string;
   date: string;
   payerUserId: string;
+  transactionPresetId: string;
   transactionType: TransactionType;
   splitType: SplitType;
   fields: Record<string, string>;
@@ -123,11 +124,6 @@ function scanCopy(locale: "th" | "en") {
       };
 }
 
-const transactionTypeOptions: Array<{ value: TransactionType; label: { th: string; en: string } }> = [
-  { value: "food", label: { th: "ค่าอาหาร", en: "Food" } },
-  { value: "normal", label: { th: "ค่าใช้จ่ายทั่วไป", en: "Normal expense" } }
-];
-
 const splitTypeOptions: Array<{ value: SplitType; label: { th: string; en: string } }> = [
   { value: "no_split", label: { th: "ส่วนตัว ไม่หาร", en: "No split" } },
   { value: "split_half", label: { th: "หารครึ่ง", en: "Split half" } },
@@ -202,6 +198,25 @@ function buildFieldState(fields: ReceiptOcrField[], fallbackMerchant: string) {
   return result;
 }
 
+function getDefaultPresetId(transactionTypePresets: TransactionTypePreset[], baseType: "food" | "normal") {
+  return (
+    transactionTypePresets.find((preset) => preset.baseType === baseType)?.id ??
+    transactionTypePresets[0]?.id ??
+    ""
+  );
+}
+
+function resolvePreset(transactionTypePresets: TransactionTypePreset[], presetId: string) {
+  return (
+    transactionTypePresets.find((preset) => preset.id === presetId) ??
+    transactionTypePresets[0] ?? {
+      id: "",
+      label: "Food",
+      baseType: "food" as const
+    }
+  );
+}
+
 function createLineDraft(line: ReceiptOcrLineItem, fallbackCategoryId: string): ReviewLine {
   return {
     id: line.id,
@@ -231,7 +246,7 @@ function emptyLine(fallbackCategoryId: string): ReviewLine {
 export function ScanPage() {
   const { locale } = useLocale();
   const copy = scanCopy(locale);
-  const { currentCycle, addTransactions, users, mode, categories } = useFlowPayStore();
+  const { currentCycle, addTransactions, users, mode, categories, transactionTypePresets } = useFlowPayStore();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [draft, setDraft] = useState<ReviewDraft | null>(null);
@@ -267,6 +282,7 @@ export function ScanPage() {
     try {
       const result = await runReceiptOcr(file);
       const fallbackCategoryId = result.documentType === "receipt" ? "food" : "other";
+      const defaultPresetId = getDefaultPresetId(transactionTypePresets, result.documentType === "receipt" ? "food" : "normal");
       const lineDrafts =
         result.lineItems.length > 0
           ? result.lineItems.map((line) => createLineDraft(line, fallbackCategoryId))
@@ -288,6 +304,7 @@ export function ScanPage() {
         title: result.title || copy.fallbackTitle,
         date: result.date || new Date().toISOString().slice(0, 10),
         payerUserId: users[0]?.id ?? "",
+        transactionPresetId: defaultPresetId,
         transactionType: result.documentType === "receipt" ? "food" : "normal",
         splitType: "no_split",
         fields: buildFieldState(result.fields, result.title),
@@ -515,12 +532,23 @@ export function ScanPage() {
                 <Field label="Transaction type">
                   <select
                     className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
-                    value={draft.transactionType}
-                    onChange={(event) => updateDraftField("transactionType", event.target.value)}
+                    value={draft.transactionPresetId}
+                    onChange={(event) =>
+                      setDraft((current) => {
+                        if (!current) return current;
+                        const preset = resolvePreset(transactionTypePresets, event.target.value);
+                        return {
+                          ...current,
+                          transactionPresetId: preset.id,
+                          transactionType: preset.baseType,
+                          splitType: preset.baseType === "food" ? "no_split" : current.splitType
+                        };
+                      })
+                    }
                   >
-                    {transactionTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label[locale]}
+                    {transactionTypePresets.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
                       </option>
                     ))}
                   </select>

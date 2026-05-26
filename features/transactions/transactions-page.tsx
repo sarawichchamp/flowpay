@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
 import { Camera, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useFlowPayStore } from "@/hooks/use-flowpay-store";
 import { useLocale } from "@/hooks/use-locale";
 import { t } from "@/i18n/dictionary";
-import type { SplitType, Transaction, TransactionType } from "@/types/domain";
+import type { SplitType, Transaction, TransactionType, TransactionTypePreset } from "@/types/domain";
 import { formatTHB } from "@/utils/currency";
 import { formatShortDate } from "@/utils/date";
 import { transactionAttachmentFileSchema } from "@/utils/validation";
@@ -21,17 +20,13 @@ type DraftTransaction = {
   date: string;
   amount: string;
   payerUserId: string;
+  transactionPresetId: string;
   transactionType: TransactionType;
   splitType: SplitType;
   attachmentFile: File | null;
   attachmentUrl: string | null;
   attachmentName: string;
 };
-
-const transactionTypeOptions: Array<{ value: TransactionType; labelKey: "typeFood" | "typeNormal" }> = [
-  { value: "food", labelKey: "typeFood" },
-  { value: "normal", labelKey: "typeNormal" }
-];
 
 const splitTypeOptions: Array<{ value: SplitType; labelKey: "splitHalf" | "noSplit" | "fullReimburse" }> = [
   { value: "split_half", labelKey: "splitHalf" },
@@ -105,13 +100,34 @@ function getAttachmentName(attachmentUrl?: string | null) {
   }
 }
 
-function createDraftTransaction(userId: string): DraftTransaction {
+function getDefaultPresetId(transactionTypePresets: TransactionTypePreset[], baseType: "food" | "normal" = "food") {
+  return (
+    transactionTypePresets.find((preset) => preset.baseType === baseType)?.id ??
+    transactionTypePresets[0]?.id ??
+    ""
+  );
+}
+
+function resolvePreset(transactionTypePresets: TransactionTypePreset[], presetId: string) {
+  return (
+    transactionTypePresets.find((preset) => preset.id === presetId) ??
+    transactionTypePresets[0] ?? {
+      id: "",
+      label: "Food",
+      baseType: "food" as const
+    }
+  );
+}
+
+function createDraftTransaction(userId: string, transactionTypePresets: TransactionTypePreset[]): DraftTransaction {
+  const presetId = getDefaultPresetId(transactionTypePresets, "food");
   return {
     localId: crypto.randomUUID(),
     title: "",
     date: new Date().toISOString().slice(0, 10),
     amount: "",
     payerUserId: userId,
+    transactionPresetId: presetId,
     transactionType: "food",
     splitType: "no_split",
     attachmentFile: null,
@@ -151,10 +167,10 @@ function AttachmentPicker({
   onChange: (file?: File) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="flex items-center gap-3">
       <label
         htmlFor={inputId}
-        className="inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white/70 px-4 font-semibold text-slate-950 ring-1 ring-slate-200 transition hover:bg-white dark:bg-white/10 dark:text-white dark:ring-white/10"
+        className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white/70 px-3 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition hover:bg-white dark:bg-white/10 dark:text-white dark:ring-white/10"
       >
         <Camera className="h-4 w-4" />
         {t(locale, "attach")}
@@ -167,34 +183,34 @@ function AttachmentPicker({
         disabled={disabled}
         onChange={(event) => onChange(event.target.files?.[0])}
       />
-      {fileName ? <p className="text-xs text-slate-500 dark:text-slate-400">{fileName}</p> : null}
+      {fileName ? <p className="min-w-0 truncate text-xs text-slate-500 dark:text-slate-400">{fileName}</p> : null}
     </div>
   );
 }
 
 export function TransactionsPage() {
   const { locale } = useLocale();
-  const { currentCycle, transactions, addTransactions, updateTransaction, deleteTransaction, resetDemoData, users, mode } =
+  const { currentCycle, transactions, addTransactions, updateTransaction, deleteTransaction, resetDemoData, users, mode, transactionTypePresets } =
     useFlowPayStore();
   const copy = transactionsCopy(locale);
-  const [drafts, setDrafts] = useState<DraftTransaction[]>([createDraftTransaction(users[0].id)]);
+  const [drafts, setDrafts] = useState<DraftTransaction[]>([createDraftTransaction(users[0].id, transactionTypePresets)]);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<DraftTransaction>(createDraftTransaction(users[0].id));
+  const [editDraft, setEditDraft] = useState<DraftTransaction>(createDraftTransaction(users[0].id, transactionTypePresets));
   const [submitError, setSubmitError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setDrafts((current) => (current.length ? current : [createDraftTransaction(users[0].id)]));
-  }, [users]);
+    setDrafts((current) => (current.length ? current : [createDraftTransaction(users[0].id, transactionTypePresets)]));
+  }, [transactionTypePresets, users]);
 
   function resetBatchForm() {
-    setDrafts([createDraftTransaction(users[0].id)]);
+    setDrafts([createDraftTransaction(users[0].id, transactionTypePresets)]);
     setSubmitError("");
   }
 
   function resetEditForm() {
     setEditingTransactionId(null);
-    setEditDraft(createDraftTransaction(users[0].id));
+    setEditDraft(createDraftTransaction(users[0].id, transactionTypePresets));
     setSubmitError("");
   }
 
@@ -203,6 +219,11 @@ export function TransactionsPage() {
       current.map((draft) => {
         if (draft.localId !== localId) return draft;
         const next = { ...draft, ...patch };
+        if (patch.transactionPresetId) {
+          const preset = resolvePreset(transactionTypePresets, patch.transactionPresetId);
+          next.transactionPresetId = preset.id;
+          next.transactionType = preset.baseType;
+        }
         if (next.transactionType === "food") {
           next.splitType = "no_split";
         }
@@ -214,6 +235,11 @@ export function TransactionsPage() {
   function updateEditDraft(patch: Partial<DraftTransaction>) {
     setEditDraft((current) => {
       const next = { ...current, ...patch };
+      if (patch.transactionPresetId) {
+        const preset = resolvePreset(transactionTypePresets, patch.transactionPresetId);
+        next.transactionPresetId = preset.id;
+        next.transactionType = preset.baseType;
+      }
       if (next.transactionType === "food") {
         next.splitType = "no_split";
       }
@@ -266,13 +292,13 @@ export function TransactionsPage() {
   }
 
   function addRow() {
-    setDrafts((current) => [...current, createDraftTransaction(users[0].id)]);
+    setDrafts((current) => [...current, createDraftTransaction(users[0].id, transactionTypePresets)]);
   }
 
   function removeRow(localId: string) {
     setDrafts((current) => {
       const next = current.filter((draft) => draft.localId !== localId);
-      return next.length ? next : [createDraftTransaction(users[0].id)];
+      return next.length ? next : [createDraftTransaction(users[0].id, transactionTypePresets)];
     });
   }
 
@@ -341,12 +367,14 @@ export function TransactionsPage() {
     if (transaction.transactionType === "installment") return;
 
     setEditingTransactionId(transaction.id);
+    const preset = transactionTypePresets.find((item) => item.baseType === transaction.transactionType) ?? transactionTypePresets[0];
     setEditDraft({
       localId: transaction.id,
       title: transaction.title,
       date: transaction.date,
       amount: String(transaction.amount),
       payerUserId: transaction.payerUserId,
+      transactionPresetId: preset?.id ?? "",
       transactionType: transaction.transactionType,
       splitType: transaction.transactionType === "food" ? "no_split" : transaction.splitType,
       attachmentFile: null,
@@ -371,7 +399,7 @@ export function TransactionsPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+    <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
       <Card>
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
@@ -379,16 +407,16 @@ export function TransactionsPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold">{editingTransactionId ? copy.editTitle : copy.addTitle}</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
           </div>
         </div>
 
         {editingTransactionId ? (
-          <form className="mt-6 space-y-4" onSubmit={handleEditSubmit}>
-            <Field label={t(locale, "title")}>
-              <Input value={editDraft.title} onChange={(event) => updateEditDraft({ title: event.target.value })} />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
+          <form className="mt-5 space-y-3" onSubmit={handleEditSubmit}>
+            <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_0.9fr]">
+              <Field label={t(locale, "title")}>
+                <Input value={editDraft.title} onChange={(event) => updateEditDraft({ title: event.target.value })} />
+              </Field>
               <Field label={t(locale, "date")}>
                 <Input type="date" value={editDraft.date} onChange={(event) => updateEditDraft({ date: event.target.value })} />
               </Field>
@@ -402,16 +430,16 @@ export function TransactionsPage() {
                 />
               </Field>
             </div>
-            <div className={editDraft.transactionType === "food" ? "grid gap-3" : "grid grid-cols-2 gap-3"}>
+            <div className={editDraft.transactionType === "food" ? "grid gap-3 md:grid-cols-[1fr_1fr]" : "grid gap-3 md:grid-cols-[1fr_1fr_1fr]"}>
               <Field label={copy.typeLabel}>
                 <select
                   className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
-                  value={editDraft.transactionType}
-                  onChange={(event) => updateEditDraft({ transactionType: event.target.value as TransactionType })}
+                  value={editDraft.transactionPresetId}
+                  onChange={(event) => updateEditDraft({ transactionPresetId: event.target.value })}
                 >
-                  {transactionTypeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {t(locale, option.labelKey)}
+                  {transactionTypePresets.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -431,20 +459,20 @@ export function TransactionsPage() {
                   </select>
                 </Field>
               ) : null}
+              <Field label={t(locale, "paid")}>
+                <select
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
+                  value={editDraft.payerUserId}
+                  onChange={(event) => updateEditDraft({ payerUserId: event.target.value })}
+                >
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.displayName} {t(locale, "paid")}
+                    </option>
+                  ))}
+                </select>
+              </Field>
             </div>
-            <Field label={t(locale, "paid")}>
-              <select
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
-                value={editDraft.payerUserId}
-                onChange={(event) => updateEditDraft({ payerUserId: event.target.value })}
-              >
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.displayName} {t(locale, "paid")}
-                  </option>
-                ))}
-              </select>
-            </Field>
             <AttachmentPicker
               locale={locale}
               inputId={`transaction-edit-attachment-${editingTransactionId}`}
@@ -452,7 +480,7 @@ export function TransactionsPage() {
               disabled={isSaving}
               onChange={setEditAttachment}
             />
-            <div className="grid grid-cols-[auto_1fr_auto] gap-3">
+            <div className="grid grid-cols-[auto_1fr_auto] gap-2">
               <Button type="button" variant="ghost" onClick={resetEditForm}>
                 <X className="h-4 w-4" />
                 {copy.cancelEdit}
@@ -465,11 +493,11 @@ export function TransactionsPage() {
             {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
           </form>
         ) : (
-          <form className="mt-6 space-y-4" onSubmit={handleBatchSubmit}>
+          <form className="mt-5 space-y-3" onSubmit={handleBatchSubmit}>
             {drafts.map((draft, index) => (
-              <div key={draft.localId} className="rounded-2xl border border-slate-200 p-4 dark:border-white/10">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+              <div key={draft.localId} className="rounded-2xl border border-slate-200 p-3 dark:border-white/10">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                     {copy.rowLabel} {index + 1}
                   </p>
                   <Button
@@ -483,10 +511,10 @@ export function TransactionsPage() {
                     {copy.removeRow}
                   </Button>
                 </div>
-                <Field label={t(locale, "title")}>
-                  <Input value={draft.title} onChange={(event) => updateDraft(draft.localId, { title: event.target.value })} />
-                </Field>
-                <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="grid gap-3 md:grid-cols-[1.3fr_0.75fr_0.75fr]">
+                  <Field label={t(locale, "title")}>
+                    <Input value={draft.title} onChange={(event) => updateDraft(draft.localId, { title: event.target.value })} />
+                  </Field>
                   <Field label={t(locale, "date")}>
                     <Input type="date" value={draft.date} onChange={(event) => updateDraft(draft.localId, { date: event.target.value })} />
                   </Field>
@@ -500,16 +528,16 @@ export function TransactionsPage() {
                     />
                   </Field>
                 </div>
-                <div className={draft.transactionType === "food" ? "mt-4 grid gap-3" : "mt-4 grid grid-cols-2 gap-3"}>
+                <div className={draft.transactionType === "food" ? "mt-3 grid gap-3 md:grid-cols-[1fr_1fr]" : "mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr]"}>
                   <Field label={copy.typeLabel}>
                     <select
                       className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
-                      value={draft.transactionType}
-                      onChange={(event) => updateDraft(draft.localId, { transactionType: event.target.value as TransactionType })}
+                      value={draft.transactionPresetId}
+                      onChange={(event) => updateDraft(draft.localId, { transactionPresetId: event.target.value })}
                     >
-                      {transactionTypeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {t(locale, option.labelKey)}
+                      {transactionTypePresets.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
@@ -529,8 +557,6 @@ export function TransactionsPage() {
                       </select>
                     </Field>
                   ) : null}
-                </div>
-                <div className="mt-4">
                   <Field label={t(locale, "paid")}>
                     <select
                       className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
@@ -545,7 +571,7 @@ export function TransactionsPage() {
                     </select>
                   </Field>
                 </div>
-                <div className="mt-4">
+                <div className="mt-3">
                   <AttachmentPicker
                     locale={locale}
                     inputId={`transaction-attachment-${draft.localId}`}
@@ -556,15 +582,15 @@ export function TransactionsPage() {
                 </div>
               </div>
             ))}
-            <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-[auto_auto_1fr_auto]">
               <Button type="button" variant="ghost" onClick={() => (mode === "demo" ? resetDemoData() : resetBatchForm())}>
                 {copy.reset}
               </Button>
               <Button type="button" variant="secondary" onClick={addRow}>
                 <Plus className="h-4 w-4" />
-                {copy.addRow}
-              </Button>
-              <div />
+                  {copy.addRow}
+                </Button>
+              <div className="hidden md:block" />
               <Button type="submit" disabled={isSaving}>
                 {copy.saveAll}
               </Button>
@@ -579,53 +605,41 @@ export function TransactionsPage() {
           <h2 className="text-xl font-bold">{t(locale, "transactions")}</h2>
           <ReceiptText className="h-5 w-5 text-teal-600 dark:text-teal-300" />
         </div>
-        <div className="mt-5 space-y-3">
+        <div className="mt-4 space-y-1.5">
           {transactions.map((transaction) => (
-            <div key={transaction.id} className="rounded-2xl border border-slate-200 p-4 dark:border-white/10">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="font-bold">{transaction.title}</p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {formatShortDate(transaction.date)} - {transaction.transactionType}
-                    {transaction.transactionType !== "food" ? ` - ${transaction.splitType}` : ""}
+            <div key={transaction.id} className="rounded-xl border border-slate-200 px-3 py-2 dark:border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">
+                    {transaction.title}
+                    <span className="ml-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      {formatShortDate(transaction.date)} · {transaction.transactionType}
+                      {transaction.transactionType !== "food" ? ` · ${transaction.splitType}` : ""}
+                      {transaction.attachmentUrl ? " · att" : ""}
+                    </span>
                   </p>
-                  {transaction.attachmentUrl ? (
-                    <Link
-                      href={transaction.attachmentUrl}
-                      target="_blank"
-                      className="mt-2 inline-flex text-xs font-semibold text-teal-600 hover:underline dark:text-teal-300"
-                    >
-                      {copy.openAttachment}
-                    </Link>
-                  ) : null}
                 </div>
-                <p className="font-black">{formatTHB(transaction.amount)}</p>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-3">
+                {editingTransactionId === transaction.id ? (
+                  <span className="shrink-0 text-[10px] font-semibold text-teal-600 dark:text-teal-300">{copy.editingBadge}</span>
+                ) : null}
+                <p className="shrink-0 text-sm font-black tabular-nums">{formatTHB(transaction.amount)}</p>
                 {transaction.transactionType === "installment" ? (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{copy.lockedInstallment}</p>
+                  <span className="shrink-0 text-[10px] text-slate-500 dark:text-slate-400">lock</span>
                 ) : (
-                  <div className="flex gap-2">
-                    <Button type="button" size="sm" variant="secondary" onClick={() => startEditing(transaction)}>
+                  <div className="flex shrink-0 gap-1">
+                    <Button type="button" size="sm" variant="secondary" className="px-2" onClick={() => startEditing(transaction)}>
                       <Pencil className="h-4 w-4" />
-                      {copy.edit}
                     </Button>
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
-                      className="text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                      className="px-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
                       onClick={() => void handleDelete(transaction)}
                     >
                       <Trash2 className="h-4 w-4" />
-                      {copy.delete}
                     </Button>
                   </div>
-                )}
-                {editingTransactionId === transaction.id ? (
-                  <p className="text-xs font-semibold text-teal-600 dark:text-teal-300">{copy.editingBadge}</p>
-                ) : (
-                  <span />
                 )}
               </div>
             </div>

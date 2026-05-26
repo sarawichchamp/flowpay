@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRightLeft, CalendarDays, CreditCard, FileSpreadsheet, TrendingDown, Wallet } from "lucide-react";
+import { ArrowRightLeft, CalendarDays, ChevronDown, CreditCard, FileSpreadsheet, TrendingDown, Wallet, X } from "lucide-react";
 import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -19,6 +19,7 @@ export function DashboardPage() {
   const { locale } = useLocale();
   const { currentCycle, installments, transactions, users } = useFlowPayStore();
   const [chartsReady, setChartsReady] = useState(false);
+  const [foodDetailsOpen, setFoodDetailsOpen] = useState(false);
 
   const quickLinks =
     locale === "th"
@@ -87,6 +88,33 @@ export function DashboardPage() {
       items.push({ day: transaction.date.slice(-2), amount: last + transaction.amount });
       return items;
     }, []);
+  const foodTransactions = transactions
+    .filter((item) => item.transactionType === "food")
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+  const copy =
+    locale === "th"
+      ? {
+          foodExpenseList: "รายการอาหารที่รวมอยู่",
+          foodExpenseHint: "กดที่การ์ดเพื่อเปิดหรือซ่อนรายการอาหารทั้งหมดของรอบนี้",
+          itemDate: "วันที่",
+          itemTitle: "รายการ",
+          itemAmount: "ราคา",
+          itemPayer: "คนจ่าย",
+          paidAhead: "จ่ายก่อน",
+          walletHolderPaid: "จ่ายจากกระเป๋าอาหาร",
+          noFoodTransactions: "ยังไม่มีรายการอาหารในรอบนี้"
+        }
+      : {
+          foodExpenseList: "Included food transactions",
+          foodExpenseHint: "Click the card to show or hide every food transaction in this cycle.",
+          itemDate: "Date",
+          itemTitle: "Item",
+          itemAmount: "Amount",
+          itemPayer: "Payer",
+          paidAhead: "paid ahead",
+          noFoodTransactions: "No food transactions in this cycle"
+        };
 
   return (
     <div className="space-y-6">
@@ -141,12 +169,28 @@ export function DashboardPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: t(locale, "foodSpent"), value: formatTHB(settlement.food.spent), icon: TrendingDown },
+          { label: t(locale, "foodSpent"), value: formatTHB(settlement.food.spent), icon: TrendingDown, interactive: true },
           { label: t(locale, "carryOver"), value: formatTHB(settlement.food.carryOverToNextCycle), icon: Wallet },
           { label: t(locale, "nextContributionPerUser"), value: formatTHB(settlement.nextCycleContribution.perUserContribution), icon: CreditCard },
           { label: t(locale, "cycleDaysLeft"), value: settlement.food.remainingDays.toString(), icon: CalendarDays }
         ].map((item) => {
           const Icon = item.icon;
+          if (item.interactive) {
+            return (
+              <button key={item.label} type="button" className="text-left" onClick={() => setFoodDetailsOpen((current) => !current)}>
+                <Card className="h-full transition hover:-translate-y-0.5 hover:shadow-lg">
+                  <div className="flex items-start justify-between gap-3">
+                    <Icon className="h-5 w-5 text-teal-600 dark:text-teal-300" />
+                    <ChevronDown className={`h-5 w-5 text-slate-400 transition ${foodDetailsOpen ? "rotate-180" : ""}`} />
+                  </div>
+                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{item.label}</p>
+                  <p className="mt-1 text-2xl font-bold">{item.value}</p>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{copy.foodExpenseHint}</p>
+                </Card>
+              </button>
+            );
+          }
+
           return (
             <Card key={item.label}>
               <Icon className="h-5 w-5 text-teal-600 dark:text-teal-300" />
@@ -156,6 +200,68 @@ export function DashboardPage() {
           );
         })}
       </section>
+
+      {foodDetailsOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onClick={() => setFoodDetailsOpen(false)}>
+          <Card className="max-h-[85vh] w-full max-w-4xl overflow-hidden p-0" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">
+              <div>
+                <h2 className="text-lg font-bold">{copy.foodExpenseList}</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.foodExpenseHint}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge>{foodTransactions.length} {t(locale, "items")}</Badge>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={() => setFoodDetailsOpen(false)}
+                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {foodTransactions.length ? (
+              <div className="overflow-auto">
+                <div className="min-w-[720px]">
+                  <div className="grid grid-cols-[92px_minmax(0,1fr)_110px_220px] gap-3 bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                    <span>{copy.itemDate}</span>
+                    <span>{copy.itemTitle}</span>
+                    <span className="text-right">{copy.itemAmount}</span>
+                    <span>{copy.itemPayer}</span>
+                  </div>
+                  {foodTransactions.map((transaction) => {
+                    const payer = users.find((user) => user.id === transaction.payerUserId);
+                    const paidAhead = transaction.payerUserId !== currentCycle.foodWalletHolderUserId;
+
+                    return (
+                      <div
+                        key={transaction.id}
+                        className="grid grid-cols-[92px_minmax(0,1fr)_110px_220px] gap-3 border-t border-slate-200 px-5 py-3 text-sm dark:border-white/10"
+                      >
+                        <span className="text-slate-500 dark:text-slate-400">{formatShortDate(transaction.date)}</span>
+                        <span className="truncate font-semibold">{transaction.title}</span>
+                        <span className="text-right font-bold">{formatTHB(transaction.amount)}</span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate">{payer?.displayName ?? "-"}</span>
+                          {paidAhead ? (
+                            <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
+                              {(payer?.displayName ?? "-") + " " + copy.paidAhead}
+                            </span>
+                          ) : null}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <p className="px-5 py-4 text-sm text-slate-500 dark:text-slate-400">{copy.noFoodTransactions}</p>
+            )}
+          </Card>
+        </div>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2">
         {quickLinks.map((item) => {

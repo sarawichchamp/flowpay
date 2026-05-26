@@ -1,8 +1,15 @@
 "use client";
 
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
-import { categories as seedCategories, currentCycle as seedCurrentCycle, installments as seedInstallments, transactions as seedTransactions, users as seedUsers } from "@/data/mock";
-import type { BillingCycle, Category, Installment, Profile, SplitType, Transaction, TransactionType } from "@/types/domain";
+import {
+  categories as seedCategories,
+  currentCycle as seedCurrentCycle,
+  installments as seedInstallments,
+  transactionTypePresets as seedTransactionTypePresets,
+  transactions as seedTransactions,
+  users as seedUsers
+} from "@/data/mock";
+import type { BillingCycle, Category, Installment, Profile, SplitType, Transaction, TransactionType, TransactionTypePreset, TransactionTypePresetBaseType } from "@/types/domain";
 import type { FlowPayBootstrap } from "@/types/flowpay-store";
 
 interface NewTransactionInput {
@@ -36,6 +43,7 @@ interface FlowPayStoreValue {
   categories: Category[];
   transactions: Transaction[];
   installments: Installment[];
+  transactionTypePresets: TransactionTypePreset[];
   addTransaction: (input: NewTransactionInput) => Promise<Transaction>;
   addTransactions: (inputs: NewTransactionInput[]) => Promise<Transaction[]>;
   updateTransaction: (id: string, input: NewTransactionInput) => Promise<Transaction>;
@@ -43,12 +51,42 @@ interface FlowPayStoreValue {
   addInstallment: (input: NewInstallmentInput) => Promise<Installment>;
   updateInstallment: (id: string, input: NewInstallmentInput) => Promise<Installment>;
   deleteInstallment: (id: string) => Promise<void>;
+  addTransactionTypePreset: (input: { label: string; baseType: TransactionTypePresetBaseType }) => void;
+  updateTransactionTypePreset: (id: string, input: { label: string; baseType: TransactionTypePresetBaseType }) => void;
+  deleteTransactionTypePreset: (id: string) => void;
   resetDemoData: () => void;
 }
 
 const FlowPayStoreContext = createContext<FlowPayStoreValue | null>(null);
 const transactionsStorageKey = "flowpay-demo-transactions";
 const installmentsStorageKey = "flowpay-demo-installments";
+const transactionTypePresetsStorageKey = "flowpay-transaction-type-presets";
+
+function normalizeTransactionTypePresets(input: unknown): TransactionTypePreset[] {
+  if (!Array.isArray(input)) return seedTransactionTypePresets;
+
+  const parsed = input
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const candidate = item as Partial<TransactionTypePreset>;
+      if (
+        typeof candidate.id !== "string" ||
+        typeof candidate.label !== "string" ||
+        (candidate.baseType !== "food" && candidate.baseType !== "normal")
+      ) {
+        return null;
+      }
+
+      return {
+        id: candidate.id,
+        label: candidate.label.trim(),
+        baseType: candidate.baseType
+      } satisfies TransactionTypePreset;
+    })
+    .filter((item): item is TransactionTypePreset => item !== null && item.label.length > 0);
+
+  return parsed.length ? parsed : seedTransactionTypePresets;
+}
 
 function createTransaction(input: NewTransactionInput): Transaction {
   return {
@@ -95,28 +133,34 @@ export function FlowPayStoreProvider({
     currentCycle: seedCurrentCycle,
     transactions: seedTransactions,
     installments: seedInstallments,
-    categories: seedCategories
+    categories: seedCategories,
+    transactionTypePresets: seedTransactionTypePresets
   };
   const [transactions, setTransactions] = useState<Transaction[]>(bootstrap.transactions);
   const [installments, setInstallments] = useState<Installment[]>(bootstrap.installments);
   const [users] = useState<[Profile, Profile]>(bootstrap.users);
   const [currentCycle] = useState<BillingCycle>(bootstrap.currentCycle);
   const [categories] = useState<Category[]>(bootstrap.categories);
+  const [transactionTypePresets, setTransactionTypePresets] = useState<TransactionTypePreset[]>(bootstrap.transactionTypePresets);
   const mode = bootstrap.mode;
 
   useEffect(() => {
-    if (mode !== "demo") return;
+    const storedTransactionTypePresets = window.localStorage.getItem(transactionTypePresetsStorageKey);
     const storedTransactions = window.localStorage.getItem(transactionsStorageKey);
     const storedInstallments = window.localStorage.getItem(installmentsStorageKey);
 
     try {
+      if (storedTransactionTypePresets) {
+        setTransactionTypePresets(normalizeTransactionTypePresets(JSON.parse(storedTransactionTypePresets)));
+      }
       if (storedTransactions) setTransactions(JSON.parse(storedTransactions) as Transaction[]);
       if (storedInstallments) setInstallments(JSON.parse(storedInstallments) as Installment[]);
     } catch {
+      window.localStorage.removeItem(transactionTypePresetsStorageKey);
       window.localStorage.removeItem(transactionsStorageKey);
       window.localStorage.removeItem(installmentsStorageKey);
     }
-  }, [mode]);
+  }, []);
 
   useEffect(() => {
     if (mode !== "demo") return;
@@ -128,6 +172,10 @@ export function FlowPayStoreProvider({
     window.localStorage.setItem(installmentsStorageKey, JSON.stringify(installments));
   }, [installments, mode]);
 
+  useEffect(() => {
+    window.localStorage.setItem(transactionTypePresetsStorageKey, JSON.stringify(transactionTypePresets));
+  }, [transactionTypePresets]);
+
   const value = useMemo<FlowPayStoreValue>(
     () => ({
       mode,
@@ -136,6 +184,7 @@ export function FlowPayStoreProvider({
       categories,
       transactions,
       installments,
+      transactionTypePresets,
       addTransaction: async (input) => {
         if (mode === "production") {
           const response = await fetch("/api/transactions", {
@@ -380,13 +429,48 @@ export function FlowPayStoreProvider({
         setInstallments((current) => current.filter((installment) => installment.id !== id));
         setTransactions((current) => current.filter((transaction) => transaction.installmentId !== id));
       },
+      addTransactionTypePreset: (input) => {
+        const label = input.label.trim();
+        if (!label) return;
+
+        setTransactionTypePresets((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            label,
+            baseType: input.baseType
+          }
+        ]);
+      },
+      updateTransactionTypePreset: (id, input) => {
+        const label = input.label.trim();
+        if (!label) return;
+
+        setTransactionTypePresets((current) =>
+          current.map((preset) =>
+            preset.id === id
+              ? {
+                  ...preset,
+                  label,
+                  baseType: input.baseType
+                }
+              : preset
+          )
+        );
+      },
+      deleteTransactionTypePreset: (id) => {
+        setTransactionTypePresets((current) => {
+          const next = current.filter((preset) => preset.id !== id);
+          return next.length ? next : seedTransactionTypePresets;
+        });
+      },
       resetDemoData: () => {
         if (mode !== "demo") return;
         setTransactions(seedTransactions);
         setInstallments(seedInstallments);
       }
     }),
-    [categories, currentCycle, installments, mode, transactions, users]
+    [categories, currentCycle, installments, mode, transactionTypePresets, transactions, users]
   );
 
   return <FlowPayStoreContext.Provider value={value}>{children}</FlowPayStoreContext.Provider>;
