@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRightLeft, CalendarDays, ChevronDown, CreditCard, FileSpreadsheet, TrendingDown, Wallet, X } from "lucide-react";
-import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import type { SummaryRow } from "@/features/settlement/types";
 import { useFlowPayStore } from "@/hooks/use-flowpay-store";
 import { useLocale } from "@/hooks/use-locale";
 import { t } from "@/i18n/dictionary";
@@ -17,9 +18,10 @@ import { formatShortDate } from "@/utils/date";
 
 export function DashboardPage() {
   const { locale } = useLocale();
-  const { currentCycle, installments, transactions, users } = useFlowPayStore();
+  const { currentCycle, installments, mode, transactions, users } = useFlowPayStore();
   const [chartsReady, setChartsReady] = useState(false);
   const [foodDetailsOpen, setFoodDetailsOpen] = useState(false);
+  const [historicalSummaries, setHistoricalSummaries] = useState<SummaryRow[]>([]);
 
   const quickLinks =
     locale === "th"
@@ -55,6 +57,29 @@ export function DashboardPage() {
   useEffect(() => {
     setChartsReady(true);
   }, []);
+
+  useEffect(() => {
+    if (mode !== "production") return;
+
+    let cancelled = false;
+
+    async function loadHistoricalSummaries() {
+      const response = await fetch("/api/monthly-summary");
+      const payload = (await response.json()) as {
+        summaries?: SummaryRow[];
+      };
+
+      if (!cancelled && response.ok) {
+        setHistoricalSummaries(payload.summaries ?? []);
+      }
+    }
+
+    void loadHistoricalSummaries();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
 
   const settlement = calculateMonthlySettlement({
     cycle: currentCycle,
@@ -92,9 +117,64 @@ export function DashboardPage() {
     .filter((item) => item.transactionType === "food")
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+  const monthlyExpenseDataFromTransactions = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
+      month: "short",
+      year: "2-digit"
+    });
+    const grouped = new Map<string, { month: string; food: number; other: number }>();
+
+    transactions
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt))
+      .forEach((transaction) => {
+        const monthKey = transaction.date.slice(0, 7);
+        const existing = grouped.get(monthKey);
+
+        if (existing) {
+          if (transaction.transactionType === "food") {
+            existing.food += transaction.amount;
+          } else {
+            existing.other += transaction.amount;
+          }
+          return;
+        }
+
+        grouped.set(monthKey, {
+          month: formatter.format(new Date(`${monthKey}-01T00:00:00`)),
+          food: transaction.transactionType === "food" ? transaction.amount : 0,
+          other: transaction.transactionType === "food" ? 0 : transaction.amount
+        });
+      });
+
+    return Array.from(grouped.values());
+  }, [locale, transactions]);
+  const monthlyExpenseData = useMemo(() => {
+    if (mode === "production" && historicalSummaries.length) {
+      const formatter = new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
+        month: "short",
+        year: "2-digit"
+      });
+
+      return historicalSummaries
+        .slice()
+        .sort((a, b) => a.cycle.startDate.localeCompare(b.cycle.startDate))
+        .map((summary) => ({
+          month: formatter.format(new Date(`${summary.cycle.startDate}T00:00:00`)),
+          food: summary.expenseBreakdown.food,
+          other: summary.expenseBreakdown.other
+        }));
+    }
+
+    return monthlyExpenseDataFromTransactions;
+  }, [historicalSummaries, locale, mode, monthlyExpenseDataFromTransactions]);
   const copy =
     locale === "th"
       ? {
+          monthlyExpenses: "ค่าใช้จ่ายรายเดือน",
+          monthlyExpensesHint: "แยกค่าอาหารและค่าใช้จ่ายอื่นของแต่ละเดือน",
+          monthlyFood: "ค่าอาหาร",
+          monthlyOther: "ค่าอื่นๆ",
           foodExpenseList: "รายการอาหารที่รวมอยู่",
           foodExpenseHint: "กดที่การ์ดเพื่อเปิดหรือซ่อนรายการอาหารทั้งหมดของรอบนี้",
           itemDate: "วันที่",
@@ -106,6 +186,10 @@ export function DashboardPage() {
           noFoodTransactions: "ยังไม่มีรายการอาหารในรอบนี้"
         }
       : {
+          monthlyExpenses: "Monthly expenses",
+          monthlyExpensesHint: "Food and other expenses split by month",
+          monthlyFood: "Food",
+          monthlyOther: "Other",
           foodExpenseList: "Included food transactions",
           foodExpenseHint: "Click the card to show or hide every food transaction in this cycle.",
           itemDate: "Date",
@@ -282,6 +366,43 @@ export function DashboardPage() {
             </Link>
           );
         })}
+      </section>
+
+      <section>
+        <Card className="min-h-80 min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">{copy.monthlyExpenses}</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.monthlyExpensesHint}</p>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-teal-500" />
+                {copy.monthlyFood}
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-cyan-200" />
+                {copy.monthlyOther}
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 h-64 min-w-0">
+            {chartsReady ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyExpenseData} barCategoryGap={24}>
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+                  <Tooltip
+                    formatter={(value, name) => [formatTHB(Number(value ?? 0)), name === "food" ? copy.monthlyFood : copy.monthlyOther]}
+                    labelFormatter={(label) => `${copy.monthlyExpenses}: ${label}`}
+                  />
+                  <Bar dataKey="food" stackId="expenses" fill="#14b8a6" radius={[10, 10, 0, 0]} />
+                  <Bar dataKey="other" stackId="expenses" fill="#bae6fd" radius={[10, 10, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : null}
+          </div>
+        </Card>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">

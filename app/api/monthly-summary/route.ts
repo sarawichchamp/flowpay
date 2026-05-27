@@ -51,6 +51,14 @@ export async function GET(request: Request) {
         cycle,
         transactionCount: cycleTransactions.length,
         installmentCount: cycleTransactions.filter((transaction) => transaction.transactionType === "installment").length,
+        expenseBreakdown: {
+          food: cycleTransactions
+            .filter((transaction) => transaction.transactionType === "food")
+            .reduce((sum, transaction) => sum + transaction.amount, 0),
+          other: cycleTransactions
+            .filter((transaction) => transaction.transactionType !== "food")
+            .reduce((sum, transaction) => sum + transaction.amount, 0)
+        },
         settlement,
         detailedLedger: settlement.ledger.map((line) => {
           const transaction = line.transactionId ? transactionMap.get(line.transactionId) : undefined;

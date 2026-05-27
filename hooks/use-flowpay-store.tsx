@@ -343,10 +343,13 @@ export function FlowPayStoreProvider({
             throw new Error(payload?.error ?? "Failed to create installment");
           }
 
-          const result = (await response.json()) as { installment: Installment; transaction: Transaction };
-          setInstallments((current) => [result.installment, ...current]);
-          setTransactions((current) => [result.transaction, ...current]);
-          return result.installment;
+            const result = (await response.json()) as { installment: Installment; currentCycleTransaction: Transaction | null };
+            setInstallments((current) => [result.installment, ...current]);
+            if (result.currentCycleTransaction) {
+              const currentCycleTransaction = result.currentCycleTransaction;
+              setTransactions((current) => [currentCycleTransaction, ...current]);
+            }
+            return result.installment;
         }
 
         const installment = createInstallment(input);
@@ -384,10 +387,13 @@ export function FlowPayStoreProvider({
             throw new Error(payload?.error ?? "Failed to update installment");
           }
 
-          const result = (await response.json()) as { installment: Installment; transaction: Transaction };
-          setInstallments((current) => current.map((installment) => (installment.id === id ? result.installment : installment)));
-          setTransactions((current) => current.map((transaction) => (transaction.installmentId === id ? result.transaction : transaction)));
-          return result.installment;
+            const result = (await response.json()) as { installment: Installment; currentCycleTransaction: Transaction | null };
+            setInstallments((current) => current.map((installment) => (installment.id === id ? result.installment : installment)));
+            setTransactions((current) => {
+              const next = current.filter((transaction) => transaction.installmentId !== id);
+              return result.currentCycleTransaction ? [result.currentCycleTransaction, ...next] : next;
+            });
+            return result.installment;
         }
 
         const installment = {

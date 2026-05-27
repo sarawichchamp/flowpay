@@ -12,6 +12,10 @@ export type SummaryRow = {
   cycle: BillingCycle;
   transactionCount: number;
   installmentCount: number;
+  expenseBreakdown: {
+    food: number;
+    other: number;
+  };
   settlement: SettlementResult;
   detailedLedger: DetailedLedgerLine[];
 };
