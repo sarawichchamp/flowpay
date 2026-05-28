@@ -107,7 +107,7 @@ export default function UnlockPage() {
   const maskedCode = code.length ? "\u2022".repeat(code.length) : "";
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.18),_transparent_30%),linear-gradient(180deg,_#f6f8fb_0%,_#eef6f6_100%)] text-slate-950 dark:bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.15),_transparent_24%),linear-gradient(180deg,_#07111f_0%,_#0a1727_100%)] dark:text-white">
+    <div className="relative min-h-dvh overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.18),_transparent_30%),linear-gradient(180deg,_#f6f8fb_0%,_#eef6f6_100%)] text-slate-950 dark:bg-[radial-gradient(circle_at_top_left,_rgba(45,212,191,0.15),_transparent_24%),linear-gradient(180deg,_#07111f_0%,_#0a1727_100%)] dark:text-white">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute left-[-12%] top-[-10%] h-72 w-72 rounded-full bg-teal-300/35 blur-3xl dark:bg-teal-400/15" />
         <div className="absolute bottom-[-8%] right-[-6%] h-80 w-80 rounded-full bg-cyan-200/40 blur-3xl dark:bg-cyan-300/10" />
@@ -115,7 +115,7 @@ export default function UnlockPage() {
         <div className="absolute left-[18%] top-[30%] hidden h-60 w-60 -rotate-12 rounded-[3rem] border border-white/60 bg-white/35 shadow-[0_30px_90px_rgba(15,23,42,0.08)] backdrop-blur lg:block dark:border-white/10 dark:bg-white/[0.04]" />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen max-w-7xl items-stretch lg:grid lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="relative mx-auto flex min-h-dvh max-w-7xl items-stretch lg:grid lg:grid-cols-[1.05fr_0.95fr]">
         <section className="hidden px-8 py-10 lg:flex lg:min-h-screen lg:flex-col lg:justify-between">
           <div className="max-w-lg">
             <div className="inline-flex items-center gap-3 rounded-full border border-slate-200/70 bg-white/70 px-4 py-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.06]">
@@ -184,8 +184,9 @@ export default function UnlockPage() {
           </div>
         </section>
 
-        <section className="flex min-h-screen w-full items-center justify-center px-4 py-4 sm:px-6 sm:py-6 lg:justify-end lg:pr-8 xl:pr-12">
-          <div className="w-full max-w-[23rem] rounded-none border-0 bg-white/90 px-6 py-8 shadow-none backdrop-blur md:rounded-[2.5rem] md:border md:border-slate-200/70 md:px-8 md:py-9 md:shadow-[0_32px_90px_rgba(15,23,42,0.12)] dark:bg-[#0c1826]/90 dark:md:border-white/10 dark:md:shadow-[0_32px_90px_rgba(0,0,0,0.35)]">
+        <section className="flex min-h-dvh w-full items-center justify-center px-0 py-0 sm:px-6 sm:py-6 lg:justify-end lg:pr-8 xl:pr-12">
+          <div className="flex min-h-dvh w-full max-w-[23rem] flex-col justify-between rounded-none border-0 bg-white/90 px-5 py-5 shadow-none backdrop-blur md:min-h-0 md:justify-start md:rounded-[2.5rem] md:border md:border-slate-200/70 md:px-8 md:py-9 md:shadow-[0_32px_90px_rgba(15,23,42,0.12)] dark:bg-[#0c1826]/90 dark:md:border-white/10 dark:md:shadow-[0_32px_90px_rgba(0,0,0,0.35)]">
+            <div>
             <input
               ref={inputRef}
               value={code}
@@ -197,21 +198,20 @@ export default function UnlockPage() {
             />
 
             <div className="lg:hidden">
-              <div className="inline-flex items-center gap-3 rounded-full border border-slate-200/80 bg-white/80 px-3 py-2 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="inline-flex items-center gap-3 px-1 py-1">
                 <div className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-950 text-teal-300 dark:bg-white dark:text-slate-950">FP</div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">FlowPay</p>
-                  <p className="text-sm font-bold">{copy.brand}</p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 text-left lg:mt-0">
+            <div className="mt-6 text-left md:mt-8 lg:mt-0">
               <h2 className="text-3xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">{copy.title}</h2>
               <p className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
             </div>
 
-            <div className="mt-8 rounded-[2rem] border border-slate-200/80 bg-[#f8fbfb] p-4 shadow-inner shadow-teal-100/30 dark:border-white/10 dark:bg-white/[0.04]" onClick={() => inputRef.current?.focus()}>
+            <div className="mt-6 rounded-[2rem] border border-slate-200/80 bg-[#f8fbfb] p-4 shadow-inner shadow-teal-100/30 md:mt-8 dark:border-white/10 dark:bg-white/[0.04]" onClick={() => inputRef.current?.focus()}>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">{copy.label}</p>
               <div className="mt-3 flex min-h-12 items-center rounded-2xl border border-slate-200 bg-white px-4 text-2xl font-bold tracking-[0.35em] text-slate-950 shadow-sm dark:border-white/10 dark:bg-[#0b1320] dark:text-white">
                 <span className={maskedCode ? "" : "tracking-normal text-base font-medium text-slate-400 dark:text-slate-500"}>
@@ -221,14 +221,14 @@ export default function UnlockPage() {
               <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{copy.helper}</p>
             </div>
 
-            <div className="mt-8 grid grid-cols-3 gap-x-4 gap-y-4">
+            <div className="mt-6 grid grid-cols-3 gap-x-3 gap-y-2.5 md:mt-8 md:gap-x-4 md:gap-y-4">
               {keypadValues.map((digit) => (
                 <button
                   key={digit}
                   type="button"
                   onClick={() => appendDigit(digit)}
                   disabled={loading}
-                  className="h-14 rounded-[1.4rem] border border-transparent bg-transparent text-2xl font-bold text-slate-800 transition hover:border-slate-200 hover:bg-white hover:shadow-sm active:scale-[0.97] disabled:opacity-40 dark:text-white dark:hover:border-white/10 dark:hover:bg-white/[0.05]"
+                  className="h-12 rounded-[1.25rem] border border-transparent bg-transparent text-2xl font-bold text-slate-800 transition hover:border-slate-200 hover:bg-white hover:shadow-sm active:scale-[0.97] disabled:opacity-40 md:h-14 md:rounded-[1.4rem] dark:text-white dark:hover:border-white/10 dark:hover:bg-white/[0.05]"
                 >
                   {digit}
                 </button>
@@ -238,7 +238,7 @@ export default function UnlockPage() {
                 type="button"
                 onClick={resetDigits}
                 disabled={loading || code.length === 0}
-                className="h-14 rounded-[1.4rem] text-sm font-semibold text-slate-500 transition hover:bg-white hover:text-slate-950 active:scale-[0.97] disabled:opacity-30 dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
+                className="h-12 rounded-[1.25rem] text-sm font-semibold text-slate-500 transition hover:bg-white hover:text-slate-950 active:scale-[0.97] disabled:opacity-30 md:h-14 md:rounded-[1.4rem] dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
               >
                 {copy.reset}
               </button>
@@ -247,7 +247,7 @@ export default function UnlockPage() {
                 type="button"
                 onClick={() => appendDigit("0")}
                 disabled={loading}
-                className="h-14 rounded-[1.4rem] border border-transparent bg-transparent text-2xl font-bold text-slate-800 transition hover:border-slate-200 hover:bg-white hover:shadow-sm active:scale-[0.97] disabled:opacity-40 dark:text-white dark:hover:border-white/10 dark:hover:bg-white/[0.05]"
+                className="h-12 rounded-[1.25rem] border border-transparent bg-transparent text-2xl font-bold text-slate-800 transition hover:border-slate-200 hover:bg-white hover:shadow-sm active:scale-[0.97] disabled:opacity-40 md:h-14 md:rounded-[1.4rem] dark:text-white dark:hover:border-white/10 dark:hover:bg-white/[0.05]"
               >
                 0
               </button>
@@ -256,25 +256,28 @@ export default function UnlockPage() {
                 type="button"
                 onClick={removeDigit}
                 disabled={loading || code.length === 0}
-                className="grid h-14 place-items-center rounded-[1.4rem] text-slate-500 transition hover:bg-white hover:text-slate-950 active:scale-[0.97] disabled:opacity-30 dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
+                className="grid h-12 place-items-center rounded-[1.25rem] text-slate-500 transition hover:bg-white hover:text-slate-950 active:scale-[0.97] disabled:opacity-30 md:h-14 md:rounded-[1.4rem] dark:text-slate-400 dark:hover:bg-white/[0.05] dark:hover:text-white"
                 aria-label="Delete digit"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
             </div>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => void submitCode(code)}
-              disabled={loading || code.length === 0}
-              className="mt-7 flex h-14 w-full items-center justify-center gap-3 rounded-[1.6rem] bg-teal-500 px-5 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/25 transition hover:bg-teal-400 active:scale-[0.99] disabled:opacity-40"
-            >
-              <Fingerprint className="h-5 w-5" />
-              {loading ? copy.checking : copy.submit}
-            </button>
+            <div className="pt-4">
+              <button
+                type="button"
+                onClick={() => void submitCode(code)}
+                disabled={loading || code.length === 0}
+                className="flex h-12 w-full items-center justify-center gap-3 rounded-[1.35rem] bg-teal-500 px-5 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/25 transition hover:bg-teal-400 active:scale-[0.99] disabled:opacity-40 md:h-14 md:rounded-[1.6rem]"
+              >
+                <Fingerprint className="h-5 w-5" />
+                {loading ? copy.checking : copy.submit}
+              </button>
 
-            <div className="mt-5 min-h-6 text-center">
-              {error ? <p className="text-sm font-medium text-rose-500">{error}</p> : null}
+              <div className="mt-3 min-h-5 text-center md:mt-5 md:min-h-6">
+                {error ? <p className="text-sm font-medium text-rose-500">{error}</p> : null}
+              </div>
             </div>
           </div>
         </section>
