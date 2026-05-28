@@ -59,6 +59,21 @@ export function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (!foodDetailsOpen) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [foodDetailsOpen]);
+
+  useEffect(() => {
     if (mode !== "production") return;
 
     let cancelled = false;
@@ -105,14 +120,32 @@ export function DashboardPage() {
       color: "#f97316"
     }
   ].filter((item) => item.value > 0);
-  const trend = transactions
-    .slice()
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .reduce<Array<{ day: string; amount: number }>>((items, transaction) => {
-      const last = items.at(-1)?.amount ?? 0;
-      items.push({ day: transaction.date.slice(-2), amount: last + transaction.amount });
-      return items;
-    }, []);
+  const trend = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
+      day: "numeric",
+      month: "short"
+    });
+    const grouped = new Map<string, { day: string; amount: number }>();
+
+    transactions
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt))
+      .forEach((transaction) => {
+        const existing = grouped.get(transaction.date);
+
+        if (existing) {
+          existing.amount += transaction.amount;
+          return;
+        }
+
+        grouped.set(transaction.date, {
+          day: formatter.format(new Date(`${transaction.date}T00:00:00`)),
+          amount: transaction.amount
+        });
+      });
+
+    return Array.from(grouped.values());
+  }, [locale, transactions]);
   const foodTransactions = transactions
     .filter((item) => item.transactionType === "food")
     .slice()
@@ -168,6 +201,9 @@ export function DashboardPage() {
 
     return monthlyExpenseDataFromTransactions;
   }, [historicalSummaries, locale, mode, monthlyExpenseDataFromTransactions]);
+  const foodTotalLabel = locale === "th" ? "ยอดรวมค่าอาหารรอบนี้" : "Total food spending this cycle";
+  const averageDailyFoodLabel = locale === "th" ? "เฉลี่ยค่าอาหารต่อวัน" : "Average food spending per day";
+  const dailySpendingLabel = locale === "th" ? "ค่าใช้จ่ายรายวัน" : "Daily spending";
   const copy =
     locale === "th"
       ? {
@@ -251,9 +287,10 @@ export function DashboardPage() {
         </Card>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
           { label: t(locale, "foodSpent"), value: formatTHB(settlement.food.spent), icon: TrendingDown, interactive: true },
+          { label: averageDailyFoodLabel, value: formatTHB(settlement.food.averageDailySpending), icon: CalendarDays },
           { label: t(locale, "carryOver"), value: formatTHB(settlement.food.carryOverToNextCycle), icon: Wallet },
           { label: t(locale, "nextContributionPerUser"), value: formatTHB(settlement.nextCycleContribution.perUserContribution), icon: CreditCard },
           { label: t(locale, "cycleDaysLeft"), value: settlement.food.remainingDays.toString(), icon: CalendarDays }
@@ -287,7 +324,7 @@ export function DashboardPage() {
 
       {foodDetailsOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onClick={() => setFoodDetailsOpen(false)}>
-          <Card className="max-h-[85vh] w-full max-w-4xl overflow-hidden p-0" onClick={(event) => event.stopPropagation()}>
+          <Card className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden p-0" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">
               <div>
                 <h2 className="text-lg font-bold">{copy.foodExpenseList}</h2>
@@ -307,7 +344,17 @@ export function DashboardPage() {
             </div>
 
             {foodTransactions.length ? (
-              <div className="overflow-auto">
+              <div className="overflow-y-auto overscroll-contain">
+                <div className="grid gap-3 border-b border-slate-200 px-5 py-4 sm:grid-cols-2 dark:border-white/10">
+                  <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{foodTotalLabel}</p>
+                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{formatTHB(settlement.food.spent)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{averageDailyFoodLabel}</p>
+                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{formatTHB(settlement.food.averageDailySpending)}</p>
+                  </div>
+                </div>
                 <div className="min-w-[720px]">
                   <div className="grid grid-cols-[92px_minmax(0,1fr)_110px_220px] gap-3 bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
                     <span>{copy.itemDate}</span>
@@ -407,7 +454,7 @@ export function DashboardPage() {
 
       <section className="grid gap-4 lg:grid-cols-2">
         <Card className="min-h-80 min-w-0">
-          <h2 className="text-lg font-bold">{t(locale, "spendingTrend")}</h2>
+          <h2 className="text-lg font-bold">{dailySpendingLabel}</h2>
           <div className="mt-4 h-56 min-w-0">
             {chartsReady ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -458,16 +505,15 @@ export function DashboardPage() {
             <h2 className="text-lg font-bold">{t(locale, "latestTransactions")}</h2>
             <Badge>{transactions.length} {t(locale, "items")}</Badge>
           </div>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-2">
             {transactions.map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-white/5">
-                <div>
-                  <p className="font-semibold">{transaction.title}</p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {formatShortDate(transaction.date)} · {transaction.transactionType}
-                  </p>
+              <div key={transaction.id} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 dark:bg-white/5">
+                <div className="flex min-w-0 items-center gap-2 text-sm">
+                  <span className="shrink-0 text-slate-500 dark:text-slate-400">{formatShortDate(transaction.date)}</span>
+                  <span className="truncate font-semibold">{transaction.title}</span>
+                  <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{transaction.transactionType}</span>
                 </div>
-                <p className="font-bold">{formatTHB(transaction.amount)}</p>
+                <p className="shrink-0 text-sm font-bold">{formatTHB(transaction.amount)}</p>
               </div>
             ))}
           </div>
