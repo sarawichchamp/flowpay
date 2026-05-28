@@ -8,6 +8,15 @@ export function isSupabaseConfigured() {
 export type AppMode = "demo" | "production";
 
 export function getAppMode(): AppMode {
+  const configuredMode = process.env.FLOWPAY_APP_MODE;
+  if (configuredMode === "demo" || configuredMode === "production") {
+    return configuredMode;
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    return "demo";
+  }
+
   return isSupabaseConfigured() && isSupabaseAdminConfigured() && isHouseholdAccessConfigured()
     ? "production"
     : "demo";
