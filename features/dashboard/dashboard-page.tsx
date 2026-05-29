@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { eachDayOfInterval, format, parseISO } from "date-fns";
 import { motion } from "framer-motion";
-import { ArrowRightLeft, CalendarDays, ChevronDown, CreditCard, FileSpreadsheet, TrendingDown, Wallet, X } from "lucide-react";
-import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CalendarDays, ChevronDown, PieChart as PieChartIcon, TrendingDown, Wallet, X } from "lucide-react";
+import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { SummaryRow } from "@/features/settlement/types";
@@ -14,8 +15,15 @@ import { t } from "@/i18n/dictionary";
 import { calculateMonthlySettlement } from "@/services/settlement/calculate-monthly-settlement";
 import { createClient } from "@/services/supabase/browser";
 import { getCategoryLabel } from "@/utils/categories";
-import { formatTHB } from "@/utils/currency";
-import { formatShortDate } from "@/utils/date";
+import { formatTHB, roundMoney } from "@/utils/currency";
+import { formatShortDate, inclusiveDays } from "@/utils/date";
+
+function toLocalDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 export function DashboardPage() {
   const { locale } = useLocale();
@@ -24,36 +32,20 @@ export function DashboardPage() {
   const [foodDetailsOpen, setFoodDetailsOpen] = useState(false);
   const [historicalSummaries, setHistoricalSummaries] = useState<SummaryRow[]>([]);
 
-  const quickLinks =
+  const monthlySummaryLink =
     locale === "th"
-      ? [
-          {
-            href: "/monthly-summary",
-            title: "สรุปรายเดือน",
-            description: "ดูภาพรวมย้อนหลังแยกตามรอบบิล",
-            icon: CalendarDays
-          },
-          {
-            href: "/import-history",
-            title: "อัปโหลดข้อมูลเก่า",
-            description: "นำเข้าข้อมูลย้อนหลังจากไฟล์ Excel",
-            icon: FileSpreadsheet
-          }
-        ]
-      : [
-          {
-            href: "/monthly-summary",
-            title: "Monthly summary",
-            description: "Review historical results by billing cycle",
-            icon: CalendarDays
-          },
-          {
-            href: "/import-history",
-            title: "Import history",
-            description: "Backfill older data from an Excel file",
-            icon: FileSpreadsheet
-          }
-        ];
+      ? {
+          href: "/monthly-summary",
+          title: "สรุปรายเดือน",
+          description: "ดูภาพรวมย้อนหลังแยกตามแต่ละรอบบิล",
+          icon: CalendarDays
+        }
+      : {
+          href: "/monthly-summary",
+          title: "Monthly summary",
+          description: "Review historical results by billing cycle",
+          icon: CalendarDays
+        };
 
   useEffect(() => {
     setChartsReady(true);
@@ -111,54 +103,74 @@ export function DashboardPage() {
     userIds: [users[0].id, users[1].id],
     today: new Date()
   });
-  const finalTransfer = settlement.finalTransfer;
-  const categoryData = [
-    {
-      name: getCategoryLabel(locale, "food"),
-      value: transactions.filter((item) => item.transactionType === "food").reduce((sum, item) => sum + item.amount, 0),
-      color: "#14b8a6"
-    },
-    {
-      name: t(locale, "typeNormal"),
-      value: transactions.filter((item) => item.transactionType === "normal").reduce((sum, item) => sum + item.amount, 0),
-      color: "#8b5cf6"
-    },
-    {
-      name: t(locale, "typeInstallment"),
-      value: transactions.filter((item) => item.transactionType === "installment").reduce((sum, item) => sum + item.amount, 0),
-      color: "#f97316"
-    }
-  ].filter((item) => item.value > 0);
-  const trend = useMemo(() => {
-    const formatter = new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
-      day: "numeric",
-      month: "short"
-    });
-    const grouped = new Map<string, { day: string; amount: number }>();
 
-    transactions
-      .slice()
-      .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt))
-      .forEach((transaction) => {
-        const existing = grouped.get(transaction.date);
+  const foodTransactions = useMemo(
+    () =>
+      transactions
+        .filter((item) => item.transactionType === "food")
+        .slice()
+        .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt)),
+    [transactions]
+  );
 
-        if (existing) {
-          existing.amount += transaction.amount;
-          return;
+  const otherExpenseTotal = useMemo(
+    () => transactions.filter((item) => item.transactionType !== "food").reduce((sum, item) => sum + item.amount, 0),
+    [transactions]
+  );
+
+  const categoryData = useMemo(
+    () =>
+      [
+        {
+          name: getCategoryLabel(locale, "food"),
+          value: foodTransactions.reduce((sum, item) => sum + item.amount, 0),
+          color: "#14b8a6"
+        },
+        {
+          name: t(locale, "typeNormal"),
+          value: transactions.filter((item) => item.transactionType === "normal").reduce((sum, item) => sum + item.amount, 0),
+          color: "#0f766e"
+        },
+        {
+          name: t(locale, "typeInstallment"),
+          value: transactions.filter((item) => item.transactionType === "installment").reduce((sum, item) => sum + item.amount, 0),
+          color: "#cbd5e1"
         }
+      ].filter((item) => item.value > 0),
+    [foodTransactions, locale, transactions]
+  );
 
-        grouped.set(transaction.date, {
-          day: formatter.format(new Date(`${transaction.date}T00:00:00`)),
-          amount: transaction.amount
-        });
-      });
+  const totalCycleDays = inclusiveDays(currentCycle.startDate, currentCycle.endDate);
+  const dailyFoodQuota = roundMoney(settlement.food.budgetAvailable / totalCycleDays);
+  const todayDateKey = toLocalDateKey(new Date());
 
-    return Array.from(grouped.values());
-  }, [locale, transactions]);
-  const foodTransactions = transactions
-    .filter((item) => item.transactionType === "food")
-    .slice()
-    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+  const dailyFoodData = useMemo(() => {
+    const foodByDate = new Map<string, number>();
+
+    for (const transaction of foodTransactions) {
+      foodByDate.set(transaction.date, roundMoney((foodByDate.get(transaction.date) ?? 0) + transaction.amount));
+    }
+
+    return eachDayOfInterval({
+      start: parseISO(currentCycle.startDate),
+      end: parseISO(currentCycle.endDate)
+    }).map((day) => {
+      const dateKey = format(day, "yyyy-MM-dd");
+      const spent = foodByDate.get(dateKey) ?? 0;
+
+      return {
+        dateKey,
+        day: format(day, locale === "th" ? "d MMM" : "MMM d"),
+        quota: dailyFoodQuota,
+        spent,
+        delta: roundMoney(spent - dailyFoodQuota)
+      };
+    });
+  }, [currentCycle.endDate, currentCycle.startDate, dailyFoodQuota, foodTransactions, locale]);
+
+  const todayFoodSpent = dailyFoodData.find((item) => item.dateKey === todayDateKey)?.spent ?? 0;
+  const todayFoodDelta = roundMoney(todayFoodSpent - dailyFoodQuota);
+
   const monthlyExpenseDataFromTransactions = useMemo(() => {
     const formatter = new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
       month: "short",
@@ -191,6 +203,7 @@ export function DashboardPage() {
 
     return Array.from(grouped.values());
   }, [locale, transactions]);
+
   const monthlyExpenseData = useMemo(() => {
     if (mode === "production" && historicalSummaries.length) {
       const formatter = new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
@@ -210,50 +223,81 @@ export function DashboardPage() {
 
     return monthlyExpenseDataFromTransactions;
   }, [historicalSummaries, locale, mode, monthlyExpenseDataFromTransactions]);
-  const foodTotalLabel = locale === "th" ? "ยอดรวมค่าอาหารรอบนี้" : "Total food spending this cycle";
-  const averageDailyFoodLabel = locale === "th" ? "เฉลี่ยค่าอาหารต่อวัน" : "Average food spending per day";
-  const dailySpendingLabel = locale === "th" ? "ค่าใช้จ่ายรายวัน" : "Daily spending";
+
   const copy =
     locale === "th"
       ? {
-          monthlyExpenses: "ค่าใช้จ่ายรายเดือน",
-          monthlyExpensesHint: "แยกค่าอาหารและค่าใช้จ่ายอื่นของแต่ละเดือน",
-          monthlyFood: "ค่าอาหาร",
-          monthlyOther: "ค่าอื่นๆ",
-          foodExpenseList: "รายการอาหารที่รวมอยู่",
-          foodExpenseHint: "กดที่การ์ดเพื่อเปิดหรือซ่อนรายการอาหารทั้งหมดของรอบนี้",
+          foodSpentLabel: "ค่าอาหารกินไปแล้ว",
+          otherSpentLabel: "ค่าใช้จ่ายอื่นๆ รวมแล้ว",
+          todayFoodLabel: "วันนี้กินไปแล้ว",
+          todayQuotaLabel: "โควต้าอาหารวันนี้",
+          averageDailyFoodLabel: "เฉลี่ยค่าอาหารต่อวัน",
+          foodExpenseList: "รายการค่าอาหารรอบนี้",
+          foodExpenseHint: "กดการ์ดเพื่อดูรายการค่าอาหารทั้งหมดของรอบนี้",
+          foodTotal: "ยอดรวมค่าอาหารรอบนี้",
           itemDate: "วันที่",
           itemTitle: "รายการ",
           itemAmount: "ราคา",
           itemPayer: "คนจ่าย",
           paidAhead: "จ่ายก่อน",
-          walletHolderPaid: "จ่ายจากกระเป๋าอาหาร",
-          noFoodTransactions: "ยังไม่มีรายการอาหารในรอบนี้"
+          noFoodTransactions: "ยังไม่มีรายการอาหารในรอบนี้",
+          dailyQuotaChart: "โควต้าอาหารรายวัน",
+          dailyQuotaHint: "เทียบโควต้าต่อวันกับค่าอาหารที่ใช้จริง เพื่อดูว่าวันไหนกินต่ำหรือเกินงบ",
+          dailySpentSeries: "ใช้จริง",
+          dailyQuotaSeries: "โควต้า",
+          overBudget: "เกินโควต้า",
+          underBudget: "ต่ำกว่าโควต้า",
+          overBudgetHighlight: "สีส้มแดง = วันเกินโควต้า",
+          monthlyExpenses: "ค่าใช้จ่ายรายเดือน",
+          monthlyExpensesHint: "แยกค่าอาหารและค่าใช้จ่ายอื่นของแต่ละเดือน",
+          monthlyFood: "ค่าอาหาร",
+          monthlyOther: "ค่าใช้จ่ายอื่น",
+          categoryMixTitle: "สัดส่วนค่าใช้จ่าย",
+          todayVsQuota: `ใช้ไป ${formatTHB(todayFoodSpent)} จากโควต้า ${formatTHB(dailyFoodQuota)}`,
+          latestTransactions: "รายการล่าสุด"
         }
       : {
-          monthlyExpenses: "Monthly expenses",
-          monthlyExpensesHint: "Food and other expenses split by month",
-          monthlyFood: "Food",
-          monthlyOther: "Other",
-          foodExpenseList: "Included food transactions",
-          foodExpenseHint: "Click the card to show or hide every food transaction in this cycle.",
+          foodSpentLabel: "Food spent this cycle",
+          otherSpentLabel: "Other expenses total",
+          todayFoodLabel: "Food spent today",
+          todayQuotaLabel: "Today's food quota",
+          averageDailyFoodLabel: "Average food spending per day",
+          foodExpenseList: "Food transactions this cycle",
+          foodExpenseHint: "Tap the card to see all food transactions in this cycle.",
+          foodTotal: "Total food spending this cycle",
           itemDate: "Date",
           itemTitle: "Item",
           itemAmount: "Amount",
           itemPayer: "Payer",
           paidAhead: "paid ahead",
-          noFoodTransactions: "No food transactions in this cycle"
+          noFoodTransactions: "No food transactions in this cycle",
+          dailyQuotaChart: "Daily food quota",
+          dailyQuotaHint: "Compare each day's food quota with actual spending to spot days that run under or over budget.",
+          dailySpentSeries: "Spent",
+          dailyQuotaSeries: "Quota",
+          overBudget: "Over quota",
+          underBudget: "Under quota",
+          overBudgetHighlight: "Orange-red bars mark days that go over quota",
+          monthlyExpenses: "Monthly expenses",
+          monthlyExpensesHint: "Food and other expenses split by month",
+          monthlyFood: "Food",
+          monthlyOther: "Other",
+          categoryMixTitle: "Category mix",
+          todayVsQuota: `Spent ${formatTHB(todayFoodSpent)} out of ${formatTHB(dailyFoodQuota)} today`,
+          latestTransactions: "Latest transactions"
         };
+
+  const MonthlySummaryIcon = monthlySummaryLink.icon;
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+      <section>
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="overflow-hidden bg-slate-950 p-0 text-white dark:bg-white/[0.08]">
             <div className="relative p-6 sm:p-8">
               <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-teal-400/20 blur-3xl" />
               <Badge className="bg-teal-300/15 text-teal-200">{t(locale, "sharedFoodWallet")}</Badge>
-              <div className="mt-6 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
+              <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
                 <div>
                   <p className="text-sm text-slate-300">{t(locale, "remainingBudget")}</p>
                   <h1 className="mt-2 text-4xl font-black tracking-normal sm:text-5xl">
@@ -265,44 +309,32 @@ export function DashboardPage() {
                     {formatShortDate(currentCycle.startDate)} - {formatShortDate(currentCycle.endDate)}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <p className="text-sm text-slate-300">{t(locale, "recommendedToday")}</p>
-                  <p className="mt-1 text-2xl font-bold">{formatTHB(settlement.food.recommendedMaxDailySpending)}</p>
-                  <p className="mt-1 text-xs text-slate-400">{settlement.food.remainingDays} {t(locale, "daysLeft")}</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                  <div className="rounded-2xl bg-white/10 p-4">
+                    <p className="text-sm text-slate-300">{copy.todayQuotaLabel}</p>
+                    <p className="mt-1 text-2xl font-bold">{formatTHB(dailyFoodQuota)}</p>
+                    <p className="mt-1 text-xs text-slate-400">{settlement.food.remainingDays} {t(locale, "daysLeft")}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 p-4">
+                    <p className="text-sm text-slate-300">{copy.todayFoodLabel}</p>
+                    <p className="mt-1 text-2xl font-bold">{formatTHB(todayFoodSpent)}</p>
+                    <p className={`mt-1 text-xs ${todayFoodDelta > 0 ? "text-rose-200" : "text-emerald-200"}`}>
+                      {todayFoodDelta > 0 ? copy.overBudget : copy.underBudget} {formatTHB(Math.abs(todayFoodDelta))}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
           </Card>
         </motion.div>
-
-        <Card>
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
-              <ArrowRightLeft className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{t(locale, "finalSettlement")}</p>
-              <p className="text-xl font-bold">
-                {finalTransfer
-                  ? `${users.find((user) => user.id === finalTransfer.fromUserId)?.displayName} ${t(locale, "transfers")} ${users.find((user) => user.id === finalTransfer.toUserId)?.displayName}`
-                  : t(locale, "allSettled")}
-              </p>
-            </div>
-          </div>
-          <p className="mt-6 text-4xl font-black">{formatTHB(finalTransfer?.amount ?? 0)}</p>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {t(locale, "settlementIncludes")}
-          </p>
-        </Card>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: t(locale, "foodSpent"), value: formatTHB(settlement.food.spent), icon: TrendingDown, interactive: true },
-          { label: averageDailyFoodLabel, value: formatTHB(settlement.food.averageDailySpending), icon: CalendarDays },
-          { label: t(locale, "carryOver"), value: formatTHB(settlement.food.carryOverToNextCycle), icon: Wallet },
-          { label: t(locale, "nextContributionPerUser"), value: formatTHB(settlement.nextCycleContribution.perUserContribution), icon: CreditCard },
-          { label: t(locale, "cycleDaysLeft"), value: settlement.food.remainingDays.toString(), icon: CalendarDays }
+          { label: copy.foodSpentLabel, value: formatTHB(settlement.food.spent), icon: TrendingDown, interactive: true, hint: copy.foodExpenseHint },
+          { label: copy.otherSpentLabel, value: formatTHB(otherExpenseTotal), icon: Wallet },
+          { label: copy.todayFoodLabel, value: `${formatTHB(todayFoodSpent)} / ${formatTHB(dailyFoodQuota)}`, icon: CalendarDays, hint: copy.todayVsQuota },
+          { label: copy.averageDailyFoodLabel, value: formatTHB(settlement.food.averageDailySpending), icon: CalendarDays }
         ].map((item) => {
           const Icon = item.icon;
           if (item.interactive) {
@@ -315,7 +347,7 @@ export function DashboardPage() {
                   </div>
                   <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{item.label}</p>
                   <p className="mt-1 text-2xl font-bold">{item.value}</p>
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{copy.foodExpenseHint}</p>
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{item.hint}</p>
                 </Card>
               </button>
             );
@@ -326,6 +358,7 @@ export function DashboardPage() {
               <Icon className="h-5 w-5 text-teal-600 dark:text-teal-300" />
               <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{item.label}</p>
               <p className="mt-1 text-2xl font-bold">{item.value}</p>
+              {item.hint ? <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{item.hint}</p> : null}
             </Card>
           );
         })}
@@ -356,11 +389,11 @@ export function DashboardPage() {
               <div className="overflow-y-auto overscroll-contain">
                 <div className="grid gap-3 border-b border-slate-200 px-5 py-4 sm:grid-cols-2 dark:border-white/10">
                   <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{foodTotalLabel}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{copy.foodTotal}</p>
                     <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{formatTHB(settlement.food.spent)}</p>
                   </div>
                   <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{averageDailyFoodLabel}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{copy.averageDailyFoodLabel}</p>
                     <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{formatTHB(settlement.food.averageDailySpending)}</p>
                   </div>
                 </div>
@@ -403,25 +436,100 @@ export function DashboardPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2">
-        {quickLinks.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link key={item.href} href={item.href} className="block">
-              <Card className="h-full transition hover:-translate-y-0.5 hover:shadow-lg">
-                <div className="flex items-start gap-4">
-                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold">{item.title}</h2>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.description}</p>
-                  </div>
+      <section>
+        <Card className="min-h-80 min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">{copy.dailyQuotaChart}</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.dailyQuotaHint}</p>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-slate-300" />
+                {copy.dailyQuotaSeries}
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-teal-500" />
+                {copy.dailySpentSeries}
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-orange-500" />
+                {copy.overBudgetHighlight}
+              </span>
+            </div>
+          </div>
+          <div className="mt-4 h-72 min-w-0">
+            {chartsReady ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dailyFoodData} barCategoryGap={10}>
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
+                  <Tooltip
+                    formatter={(value, name, entry) => {
+                      if (name === "quota") return [formatTHB(Number(value ?? 0)), copy.dailyQuotaSeries];
+                      const delta = Number(entry?.payload?.delta ?? 0);
+                      const deltaLabel = delta > 0 ? copy.overBudget : copy.underBudget;
+                      return [`${formatTHB(Number(value ?? 0))} (${deltaLabel} ${formatTHB(Math.abs(delta))})`, copy.dailySpentSeries];
+                    }}
+                    labelFormatter={(label) => `${copy.dailyQuotaChart}: ${label}`}
+                  />
+                  <Bar dataKey="quota" fill="#cbd5e1" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="spent" radius={[8, 8, 0, 0]}>
+                    {dailyFoodData.map((entry) => (
+                      <Cell key={entry.dateKey} fill={entry.delta > 0 ? "#f97316" : "#14b8a6"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : null}
+          </div>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
+        <Link href={monthlySummaryLink.href} className="block">
+          <Card className="h-full transition hover:-translate-y-0.5 hover:shadow-lg">
+            <div className="flex items-start gap-4">
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
+                <MonthlySummaryIcon className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold">{monthlySummaryLink.title}</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{monthlySummaryLink.description}</p>
+              </div>
+            </div>
+          </Card>
+        </Link>
+
+        <Card className="min-w-0">
+          <h2 className="text-lg font-bold">{copy.categoryMixTitle}</h2>
+          <div className="mt-4 grid h-56 min-w-0 grid-cols-[0.9fr_1fr] items-center gap-2">
+            <div className="h-full min-w-0">
+              {chartsReady ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={categoryData} dataKey="value" innerRadius={44} outerRadius={76} paddingAngle={4}>
+                      {categoryData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : null}
+            </div>
+            <div className="space-y-3">
+              {categoryData.map((item) => (
+                <div key={item.name} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full" style={{ background: item.color }} />
+                    {item.name}
+                  </span>
+                  <strong>{formatTHB(item.value)}</strong>
                 </div>
-              </Card>
-            </Link>
-          );
-        })}
+              ))}
+            </div>
+          </div>
+        </Card>
       </section>
 
       <section>
@@ -461,57 +569,10 @@ export function DashboardPage() {
         </Card>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card className="min-h-80 min-w-0">
-          <h2 className="text-lg font-bold">{dailySpendingLabel}</h2>
-          <div className="mt-4 h-56 min-w-0">
-            {chartsReady ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trend}>
-                  <XAxis dataKey="day" axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(value) => formatTHB(Number(value))} />
-                  <Area type="monotone" dataKey="amount" stroke="#14b8a6" fill="#14b8a6" fillOpacity={0.18} strokeWidth={3} />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : null}
-          </div>
-        </Card>
-
-        <Card className="min-h-80 min-w-0">
-          <h2 className="text-lg font-bold">{t(locale, "categoryMix")}</h2>
-          <div className="mt-4 grid h-56 min-w-0 grid-cols-[0.9fr_1fr] items-center gap-2">
-            <div className="h-full min-w-0">
-              {chartsReady ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={categoryData} dataKey="value" innerRadius={44} outerRadius={76} paddingAngle={4}>
-                      {categoryData.map((entry) => (
-                        <Cell key={entry.name} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : null}
-            </div>
-            <div className="space-y-3">
-              {categoryData.map((item) => (
-                <div key={item.name} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full" style={{ background: item.color }} />
-                    {item.name}
-                  </span>
-                  <strong>{formatTHB(item.value)}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      </section>
-
       <section className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
         <Card>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">{t(locale, "latestTransactions")}</h2>
+            <h2 className="text-lg font-bold">{copy.latestTransactions}</h2>
             <Badge>{transactions.length} {t(locale, "items")}</Badge>
           </div>
           <div className="mt-4 space-y-2">
@@ -529,19 +590,28 @@ export function DashboardPage() {
         </Card>
 
         <Card className="min-w-0">
-          <h2 className="text-lg font-bold">{t(locale, "installmentOverview")}</h2>
-          <div className="mt-5 h-48 min-w-0">
-            {chartsReady ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={installments.map((item) => ({ name: item.title, done: item.currentInstallment, left: item.totalInstallments - item.currentInstallment }))}>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <Tooltip />
-                  <Bar dataKey="done" stackId="a" fill="#14b8a6" radius={[10, 10, 0, 0]} />
-                  <Bar dataKey="left" stackId="a" fill="#cbd5e1" radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : null}
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
+              <PieChartIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{copy.todayFoodLabel}</p>
+              <p className="text-xl font-bold">{copy.todayVsQuota}</p>
+            </div>
           </div>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-white/5">
+              <p className="text-sm text-slate-500 dark:text-slate-400">{copy.todayQuotaLabel}</p>
+              <p className="mt-1 text-2xl font-black">{formatTHB(dailyFoodQuota)}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-white/5">
+              <p className="text-sm text-slate-500 dark:text-slate-400">{copy.todayFoodLabel}</p>
+              <p className="mt-1 text-2xl font-black">{formatTHB(todayFoodSpent)}</p>
+            </div>
+          </div>
+          <p className={`mt-4 text-sm font-semibold ${todayFoodDelta > 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-300"}`}>
+            {todayFoodDelta > 0 ? copy.overBudget : copy.underBudget} {formatTHB(Math.abs(todayFoodDelta))}
+          </p>
         </Card>
       </section>
     </div>
