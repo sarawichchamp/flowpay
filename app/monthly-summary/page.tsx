@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CalendarRange, CreditCard, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -48,6 +49,7 @@ function monthlyCopy(locale: "th" | "en") {
 }
 
 export default function MonthlySummaryPage() {
+  const router = useRouter();
   const { locale } = useLocale();
   const copy = monthlyCopy(locale);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -65,6 +67,13 @@ export default function MonthlySummaryPage() {
         activeInstallments?: number;
       };
 
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.replace(`/unlock?next=${encodeURIComponent("/monthly-summary")}`);
+        }
+        return;
+      }
+
       if (!cancelled && response.ok) {
         setProfiles(payload.profiles ?? []);
         setSummaries(payload.summaries ?? []);
@@ -76,7 +85,7 @@ export default function MonthlySummaryPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   const latestCarryOver = useMemo(() => summaries[0]?.settlement.food.carryOverToNextCycle ?? 0, [summaries]);
   const userNameById = (userId: string) => profiles.find((profile) => profile.id === userId)?.displayName ?? "Unknown";

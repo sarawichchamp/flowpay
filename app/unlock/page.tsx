@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CreditCard, Fingerprint, Wallet } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 
@@ -9,6 +9,7 @@ const keypadValues = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export default function UnlockPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { locale } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [code, setCode] = useState("");
@@ -77,7 +78,8 @@ export default function UnlockPage() {
       return;
     }
 
-    router.push("/");
+    const nextPath = searchParams.get("next");
+    router.push(nextPath && nextPath.startsWith("/") ? nextPath : "/");
     router.refresh();
   }
 

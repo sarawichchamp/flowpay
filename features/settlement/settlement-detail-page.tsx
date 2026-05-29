@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Scale } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -128,6 +129,7 @@ function LedgerList({
 }
 
 export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
+  const router = useRouter();
   const { locale } = useLocale();
   const copy = detailCopy(locale);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -148,6 +150,10 @@ export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
         };
 
         if (!response.ok) {
+          if (response.status === 401) {
+            router.replace(`/unlock?next=${encodeURIComponent(`/settlement/${cycleStart}`)}`);
+            return;
+          }
           throw new Error(payload.error ?? copy.loadFailed);
         }
 
@@ -158,7 +164,7 @@ export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
         setError(fetchError instanceof Error ? fetchError.message : copy.loadFailed);
       })
       .finally(() => setLoading(false));
-  }, [copy.loadFailed, cycleStart]);
+  }, [copy.loadFailed, cycleStart, router]);
 
   const selectedSummary = useMemo(() => summary, [summary]);
 

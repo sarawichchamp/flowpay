@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -47,6 +48,7 @@ function settlementCopy(locale: "th" | "en") {
 }
 
 export function SettlementPage() {
+  const router = useRouter();
   const { locale } = useLocale();
   const copy = settlementCopy(locale);
   const [summaries, setSummaries] = useState<SummaryRow[]>([]);
@@ -67,6 +69,10 @@ export function SettlementPage() {
     };
 
     if (!response.ok) {
+      if (response.status === 401) {
+        router.replace(`/unlock?next=${encodeURIComponent("/settlement")}`);
+        return;
+      }
       setError(payload.error ?? copy.loadFailed);
       return;
     }
