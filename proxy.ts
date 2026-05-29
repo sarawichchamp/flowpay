@@ -5,6 +5,7 @@ import { householdAccessCookieName, isHouseholdAccessConfigured } from "@/servic
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
   const { pathname } = request.nextUrl;
+  const requiresReauth = request.nextUrl.searchParams.get("reauth") === "1";
   const isUnlockRoute = pathname.startsWith("/unlock");
   const isApiRoute = pathname.startsWith("/api");
   const isAuthRoute = pathname.startsWith("/auth");
@@ -19,7 +20,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(unlockUrl);
     }
 
-    if (accessCookie && (isUnlockRoute || pathname === "/auth/login")) {
+    if (accessCookie && !requiresReauth && (isUnlockRoute || pathname === "/auth/login")) {
       const homeUrl = request.nextUrl.clone();
       homeUrl.pathname = "/";
       return NextResponse.redirect(homeUrl);

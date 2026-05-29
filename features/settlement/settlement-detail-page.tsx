@@ -151,7 +151,7 @@ export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
 
         if (!response.ok) {
           if (response.status === 401) {
-            router.replace(`/unlock?next=${encodeURIComponent(`/settlement/${cycleStart}`)}`);
+            router.replace(`/unlock?reauth=1&next=${encodeURIComponent(`/settlement/${cycleStart}`)}`);
             return;
           }
           throw new Error(payload.error ?? copy.loadFailed);
