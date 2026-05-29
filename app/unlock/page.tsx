@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CreditCard, Fingerprint, Wallet } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 
 const keypadValues = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
-export default function UnlockPage() {
+function UnlockPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { locale } = useLocale();
@@ -285,5 +285,13 @@ export default function UnlockPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function UnlockPage() {
+  return (
+    <Suspense fallback={null}>
+      <UnlockPageContent />
+    </Suspense>
   );
 }
