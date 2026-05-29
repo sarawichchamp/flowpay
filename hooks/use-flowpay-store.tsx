@@ -148,7 +148,7 @@ export function FlowPayStoreProvider({
   const [categories, setCategories] = useState<Category[]>(bootstrap.categories);
   const [transactionTypePresets, setTransactionTypePresets] = useState<TransactionTypePreset[]>(bootstrap.transactionTypePresets);
   const mode = bootstrap.mode;
-  const syncTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const syncTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (mode !== "production") return;
