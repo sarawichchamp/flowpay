@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
+import { createClient } from "@/services/supabase/browser";
 import type { Profile } from "@/types/domain";
 import { cn } from "@/utils/cn";
 import type { SummaryRow } from "./types";
@@ -86,8 +87,20 @@ export function SettlementPage() {
   }
 
   useEffect(() => {
+    const supabase = createClient();
     setLoading(true);
     void loadSummaries().finally(() => setLoading(false));
+
+    const channel = supabase
+      .channel("settlement-list")
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => void loadSummaries())
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_cycles" }, () => void loadSummaries())
+      .on("postgres_changes", { event: "*", schema: "public", table: "installments" }, () => void loadSummaries())
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   async function saveBudget(cycleId: string) {

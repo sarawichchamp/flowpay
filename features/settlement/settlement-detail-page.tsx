@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useLocale } from "@/hooks/use-locale";
 import { t, type DictionaryKey } from "@/i18n/dictionary";
+import { createClient } from "@/services/supabase/browser";
 import type { Profile } from "@/types/domain";
 import { getCategoryLabel } from "@/utils/categories";
 import { cn } from "@/utils/cn";
@@ -138,11 +139,15 @@ export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setLoading(true);
-    setError("");
+    const supabase = createClient();
+    let cancelled = false;
 
-    void fetch(`/api/monthly-summary?cycleStart=${encodeURIComponent(cycleStart)}`)
-      .then(async (response) => {
+    async function loadSummary() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await fetch(`/api/monthly-summary?cycleStart=${encodeURIComponent(cycleStart)}`);
         const payload = (await response.json()) as {
           profiles?: Profile[];
           summaries?: SummaryRow[];
@@ -157,13 +162,33 @@ export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
           throw new Error(payload.error ?? copy.loadFailed);
         }
 
+        if (cancelled) return;
         setProfiles(payload.profiles ?? []);
         setSummary(payload.summaries?.[0] ?? null);
-      })
-      .catch((fetchError: unknown) => {
-        setError(fetchError instanceof Error ? fetchError.message : copy.loadFailed);
-      })
-      .finally(() => setLoading(false));
+      } catch (fetchError: unknown) {
+        if (!cancelled) {
+          setError(fetchError instanceof Error ? fetchError.message : copy.loadFailed);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadSummary();
+
+    const channel = supabase
+      .channel(`settlement-detail:${cycleStart}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => void loadSummary())
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_cycles" }, () => void loadSummary())
+      .on("postgres_changes", { event: "*", schema: "public", table: "installments" }, () => void loadSummary())
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
   }, [copy.loadFailed, cycleStart, router]);
 
   const selectedSummary = useMemo(() => summary, [summary]);

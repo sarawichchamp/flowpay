@@ -12,6 +12,7 @@ import { useFlowPayStore } from "@/hooks/use-flowpay-store";
 import { useLocale } from "@/hooks/use-locale";
 import { t } from "@/i18n/dictionary";
 import { calculateMonthlySettlement } from "@/services/settlement/calculate-monthly-settlement";
+import { createClient } from "@/services/supabase/browser";
 import { getCategoryLabel } from "@/utils/categories";
 import { formatTHB } from "@/utils/currency";
 import { formatShortDate } from "@/utils/date";
@@ -77,6 +78,7 @@ export function DashboardPage() {
     if (mode !== "production") return;
 
     let cancelled = false;
+    const supabase = createClient();
 
     async function loadHistoricalSummaries() {
       const response = await fetch("/api/monthly-summary");
@@ -91,8 +93,15 @@ export function DashboardPage() {
 
     void loadHistoricalSummaries();
 
+    const channel = supabase
+      .channel("dashboard-monthly-summary")
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => void loadHistoricalSummaries())
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_cycles" }, () => void loadHistoricalSummaries())
+      .subscribe();
+
     return () => {
       cancelled = true;
+      void supabase.removeChannel(channel);
     };
   }, [mode]);
 

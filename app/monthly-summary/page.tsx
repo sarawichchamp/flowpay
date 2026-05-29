@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CalendarRange, CreditCard, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useLocale } from "@/hooks/use-locale";
+import { createClient } from "@/services/supabase/browser";
 import type { BillingCycle, Profile, SettlementResult } from "@/types/domain";
 import { formatTHB } from "@/utils/currency";
 import { formatShortDate } from "@/utils/date";
@@ -58,6 +59,7 @@ export default function MonthlySummaryPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const supabase = createClient();
 
     async function load() {
       const response = await fetch("/api/monthly-summary");
@@ -82,8 +84,17 @@ export default function MonthlySummaryPage() {
     }
 
     void load();
+
+    const channel = supabase
+      .channel("monthly-summary-page")
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_cycles" }, () => void load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "installments" }, () => void load())
+      .subscribe();
+
     return () => {
       cancelled = true;
+      void supabase.removeChannel(channel);
     };
   }, [router]);
 

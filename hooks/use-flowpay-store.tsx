@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   categories as seedCategories,
   currentCycle as seedCurrentCycle,
@@ -9,6 +9,7 @@ import {
   transactions as seedTransactions,
   users as seedUsers
 } from "@/data/mock";
+import { createClient } from "@/services/supabase/browser";
 import type { BillingCycle, Category, Installment, Profile, SplitType, Transaction, TransactionType, TransactionTypePreset, TransactionTypePresetBaseType } from "@/types/domain";
 import type { FlowPayBootstrap } from "@/types/flowpay-store";
 
@@ -120,6 +121,10 @@ function createInstallment(input: NewInstallmentInput): Installment {
   };
 }
 
+function isBootstrapUsers(users: Profile[]): users is [Profile, Profile] {
+  return users.length >= 2;
+}
+
 export function FlowPayStoreProvider({
   children,
   initialData
@@ -138,11 +143,61 @@ export function FlowPayStoreProvider({
   };
   const [transactions, setTransactions] = useState<Transaction[]>(bootstrap.transactions);
   const [installments, setInstallments] = useState<Installment[]>(bootstrap.installments);
-  const [users] = useState<[Profile, Profile]>(bootstrap.users);
-  const [currentCycle] = useState<BillingCycle>(bootstrap.currentCycle);
-  const [categories] = useState<Category[]>(bootstrap.categories);
+  const [users, setUsers] = useState<[Profile, Profile]>(bootstrap.users);
+  const [currentCycle, setCurrentCycle] = useState<BillingCycle>(bootstrap.currentCycle);
+  const [categories, setCategories] = useState<Category[]>(bootstrap.categories);
   const [transactionTypePresets, setTransactionTypePresets] = useState<TransactionTypePreset[]>(bootstrap.transactionTypePresets);
   const mode = bootstrap.mode;
+  const syncTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (mode !== "production") return;
+
+    let cancelled = false;
+    const supabase = createClient();
+
+    async function syncFromServer() {
+      const response = await fetch("/api/bootstrap", {
+        cache: "no-store"
+      });
+      if (!response.ok || cancelled) return;
+
+      const payload = (await response.json()) as FlowPayBootstrap;
+      if (payload.mode !== "production" || cancelled || !isBootstrapUsers(payload.users)) return;
+
+      setUsers([payload.users[0], payload.users[1]]);
+      setCurrentCycle(payload.currentCycle);
+      setTransactions(payload.transactions);
+      setInstallments(payload.installments);
+      setCategories(payload.categories);
+    }
+
+    function queueSync() {
+      if (syncTimeoutRef.current) {
+        window.clearTimeout(syncTimeoutRef.current);
+      }
+
+      syncTimeoutRef.current = window.setTimeout(() => {
+        void syncFromServer();
+      }, 250);
+    }
+
+    const channel = supabase
+      .channel("flowpay-household-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, queueSync)
+      .on("postgres_changes", { event: "*", schema: "public", table: "installments" }, queueSync)
+      .on("postgres_changes", { event: "*", schema: "public", table: "billing_cycles" }, queueSync)
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      if (syncTimeoutRef.current) {
+        window.clearTimeout(syncTimeoutRef.current);
+        syncTimeoutRef.current = null;
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [mode]);
 
   useEffect(() => {
     const storedTransactionTypePresets = window.localStorage.getItem(transactionTypePresetsStorageKey);
