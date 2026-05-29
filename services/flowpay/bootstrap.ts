@@ -5,6 +5,7 @@ import { defaultCarryOverAmount, defaultFoodBudgetTarget, householdPayrollDay } 
 import { createAdminClient, isSupabaseAdminConfigured } from "@/services/supabase/admin";
 import type { FlowPayBootstrap } from "@/types/flowpay-store";
 import { getBillingCycleFromPayrollDate } from "@/utils/billing-cycle";
+import { getCurrentDateInTimeZone } from "@/utils/date";
 
 let householdSetupPromise: Promise<void> | null = null;
 
@@ -103,7 +104,7 @@ async function ensureHouseholdSetup(repository: FlowPayRepository) {
   }
 
   if (!activeCycle && profiles.length >= 2) {
-    const derivedCycle = getBillingCycleFromPayrollDate(new Date(), householdPayrollDay);
+    const derivedCycle = getBillingCycleFromPayrollDate(getCurrentDateInTimeZone(), householdPayrollDay);
     const { error: cycleError } = await supabase.from("billing_cycles").insert({
       start_date: derivedCycle.startDate,
       end_date: derivedCycle.endDate,

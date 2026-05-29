@@ -11,7 +11,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { t } from "@/i18n/dictionary";
 import type { SplitType, Transaction, TransactionType, TransactionTypePreset } from "@/types/domain";
 import { formatTHB } from "@/utils/currency";
-import { formatShortDate } from "@/utils/date";
+import { formatShortDate, getCurrentDateStringInTimeZone } from "@/utils/date";
 import { transactionAttachmentFileSchema } from "@/utils/validation";
 
 type DraftTransaction = {
@@ -124,7 +124,7 @@ function createDraftTransaction(userId: string, transactionTypePresets: Transact
   return {
     localId: crypto.randomUUID(),
     title: "",
-    date: new Date().toISOString().slice(0, 10),
+    date: getCurrentDateStringInTimeZone(),
     amount: "",
     payerUserId: userId,
     transactionPresetId: presetId,

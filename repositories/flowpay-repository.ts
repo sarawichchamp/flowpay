@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { mapBillingCycle, mapCategory, mapInstallment, mapProfile, mapTransaction } from "@/repositories/mappers";
+import { getCurrentDateStringInTimeZone } from "@/utils/date";
 import { transactionSchema } from "@/utils/validation";
 
 export class FlowPayRepository {
@@ -13,7 +14,7 @@ export class FlowPayRepository {
   }
 
   async getCurrentBillingCycle() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getCurrentDateStringInTimeZone();
     const { data, error } = await this.supabase
       .from("billing_cycles")
       .select("*")
@@ -28,7 +29,7 @@ export class FlowPayRepository {
   }
 
   async getUpcomingBillingCycle() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getCurrentDateStringInTimeZone();
     const { data, error } = await this.supabase
       .from("billing_cycles")
       .select("*")
