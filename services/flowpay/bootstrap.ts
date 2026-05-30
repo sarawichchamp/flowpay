@@ -10,12 +10,23 @@ import { getCurrentDateInTimeZone } from "@/utils/date";
 let householdSetupPromise: Promise<void> | null = null;
 
 async function ensureHouseholdSetup(repository: FlowPayRepository) {
-  const supabase = createAdminClient();
   let profiles = await repository.getHouseholdProfiles();
   let activeCycle = await repository.getCurrentBillingCycle();
   const categoryRows = await repository.getCategories();
+  const needsProfiles = profiles.length < 2;
+  const missingDefaultCategoryNames = categories
+    .filter((category) => !categoryRows.some((row) => row.isDefault && row.name === category.name))
+    .map((category) => category.name);
+  const needsCategories = missingDefaultCategoryNames.length > 0;
+  const needsCycle = !activeCycle;
 
-  if (profiles.length < 2) {
+  if (!needsProfiles && !needsCategories && !needsCycle) {
+    return;
+  }
+
+  const supabase = createAdminClient();
+
+  if (needsProfiles) {
     const { data: authUsersResult, error: authUsersError } = await supabase.auth.admin.listUsers({
       page: 1,
       perPage: 200
@@ -103,7 +114,7 @@ async function ensureHouseholdSetup(repository: FlowPayRepository) {
     }
   }
 
-  if (!activeCycle && profiles.length >= 2) {
+  if (needsCycle && profiles.length >= 2) {
     const derivedCycle = getBillingCycleFromPayrollDate(getCurrentDateInTimeZone(), householdPayrollDay);
     const { error: cycleError } = await supabase.from("billing_cycles").insert({
       start_date: derivedCycle.startDate,
@@ -148,28 +159,33 @@ export async function getFlowPayBootstrap(): Promise<FlowPayBootstrap> {
   const repository = new FlowPayRepository(supabase);
 
   try {
-    await runHouseholdSetup(repository);
-
-    const [profiles, cycle, categoryRows, installmentRows] = await Promise.all([
+    let [profiles, cycle, categoryRows] = await Promise.all([
       repository.getHouseholdProfiles(),
       repository.getCurrentBillingCycle(),
-      repository.getCategories(),
-      repository.getActiveInstallments()
+      repository.getCategories()
     ]);
 
-    if (!cycle || profiles.length < 2) {
-      return {
-        mode: "demo",
-        users,
-        currentCycle,
-        transactions,
-        installments,
-        categories,
-        transactionTypePresets
-      };
+    const hasAllDefaultCategories = categories.every((category) =>
+      categoryRows.some((row) => row.isDefault && row.name === category.name)
+    );
+
+    if (!cycle || profiles.length < 2 || !hasAllDefaultCategories) {
+      await runHouseholdSetup(repository);
+      [profiles, cycle, categoryRows] = await Promise.all([
+        repository.getHouseholdProfiles(),
+        repository.getCurrentBillingCycle(),
+        repository.getCategories()
+      ]);
     }
 
-    const cycleTransactions = await repository.getTransactionsForCycle(cycle.id);
+    if (!cycle || profiles.length < 2) {
+      throw new Error("FlowPay household setup is incomplete");
+    }
+
+    const [installmentRows, cycleTransactions] = await Promise.all([
+      repository.getActiveInstallments(),
+      repository.getTransactionsForCycle(cycle.id)
+    ]);
 
     return {
       mode: "production",
@@ -181,16 +197,8 @@ export async function getFlowPayBootstrap(): Promise<FlowPayBootstrap> {
       transactionTypePresets
     };
   } catch (error) {
-    console.error("FlowPay bootstrap fallback to demo mode", error);
+    console.error("FlowPay bootstrap failed", error);
 
-    return {
-      mode: "demo",
-      users,
-      currentCycle,
-      transactions,
-      installments,
-      categories,
-      transactionTypePresets
-    };
+    throw error;
   }
 }

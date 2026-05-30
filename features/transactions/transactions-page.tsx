@@ -399,10 +399,10 @@ export function TransactionsPage() {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+    <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
       <Card>
         <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
             <Plus className="h-5 w-5" />
           </div>
           <div>
@@ -412,8 +412,8 @@ export function TransactionsPage() {
         </div>
 
         {editingTransactionId ? (
-          <form className="mt-5 space-y-3" onSubmit={handleEditSubmit}>
-            <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr_0.9fr]">
+          <form className="mt-4 space-y-2.5" onSubmit={handleEditSubmit}>
+            <div className="grid gap-2.5 md:grid-cols-[1.2fr_0.8fr_0.9fr]">
               <Field label={t(locale, "title")}>
                 <Input value={editDraft.title} onChange={(event) => updateEditDraft({ title: event.target.value })} />
               </Field>
@@ -430,10 +430,10 @@ export function TransactionsPage() {
                 />
               </Field>
             </div>
-            <div className={editDraft.transactionType === "food" ? "grid gap-3 md:grid-cols-[1fr_1fr]" : "grid gap-3 md:grid-cols-[1fr_1fr_1fr]"}>
+            <div className={editDraft.transactionType === "food" ? "grid gap-2.5 md:grid-cols-[1fr_1fr]" : "grid gap-2.5 md:grid-cols-[1fr_1fr_1fr]"}>
               <Field label={copy.typeLabel}>
                 <select
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
                   value={editDraft.transactionPresetId}
                   onChange={(event) => updateEditDraft({ transactionPresetId: event.target.value })}
                 >
@@ -447,7 +447,7 @@ export function TransactionsPage() {
               {editDraft.transactionType !== "food" ? (
                 <Field label={t(locale, "settlement")}>
                   <select
-                    className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
                     value={editDraft.splitType}
                     onChange={(event) => updateEditDraft({ splitType: event.target.value as SplitType })}
                   >
@@ -461,7 +461,7 @@ export function TransactionsPage() {
               ) : null}
               <Field label={t(locale, "paid")}>
                 <select
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
                   value={editDraft.payerUserId}
                   onChange={(event) => updateEditDraft({ payerUserId: event.target.value })}
                 >
@@ -493,10 +493,10 @@ export function TransactionsPage() {
             {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
           </form>
         ) : (
-          <form className="mt-5 space-y-3" onSubmit={handleBatchSubmit}>
+          <form className="mt-4 space-y-2.5" onSubmit={handleBatchSubmit}>
             {drafts.map((draft, index) => (
-              <div key={draft.localId} className="rounded-2xl border border-slate-200 p-3 dark:border-white/10">
-                <div className="mb-3 flex items-center justify-between gap-3">
+              <div key={draft.localId} className="rounded-xl border border-slate-200 p-2.5 dark:border-white/10">
+                <div className="mb-2 flex items-center justify-between gap-3">
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                     {copy.rowLabel} {index + 1}
                   </p>
@@ -511,7 +511,7 @@ export function TransactionsPage() {
                     {copy.removeRow}
                   </Button>
                 </div>
-                <div className="grid gap-3 md:grid-cols-[1.3fr_0.75fr_0.75fr]">
+                <div className="grid gap-2.5 md:grid-cols-[1.3fr_0.75fr_0.75fr]">
                   <Field label={t(locale, "title")}>
                     <Input value={draft.title} onChange={(event) => updateDraft(draft.localId, { title: event.target.value })} />
                   </Field>
@@ -528,10 +528,10 @@ export function TransactionsPage() {
                     />
                   </Field>
                 </div>
-                <div className={draft.transactionType === "food" ? "mt-3 grid gap-3 md:grid-cols-[1fr_1fr]" : "mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr]"}>
+                <div className={draft.transactionType === "food" ? "mt-2.5 grid gap-2.5 md:grid-cols-[1fr_1fr]" : "mt-2.5 grid gap-2.5 md:grid-cols-[1fr_1fr_1fr_1fr]"}>
                   <Field label={copy.typeLabel}>
                     <select
-                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
                       value={draft.transactionPresetId}
                       onChange={(event) => updateDraft(draft.localId, { transactionPresetId: event.target.value })}
                     >
@@ -545,7 +545,7 @@ export function TransactionsPage() {
                   {draft.transactionType !== "food" ? (
                     <Field label={t(locale, "settlement")}>
                       <select
-                        className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
                         value={draft.splitType}
                         onChange={(event) => updateDraft(draft.localId, { splitType: event.target.value as SplitType })}
                       >
@@ -559,7 +559,7 @@ export function TransactionsPage() {
                   ) : null}
                   <Field label={t(locale, "paid")}>
                     <select
-                      className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
                       value={draft.payerUserId}
                       onChange={(event) => updateDraft(draft.localId, { payerUserId: event.target.value })}
                     >
@@ -571,7 +571,7 @@ export function TransactionsPage() {
                     </select>
                   </Field>
                 </div>
-                <div className="mt-3">
+                <div className="mt-2.5">
                   <AttachmentPicker
                     locale={locale}
                     inputId={`transaction-attachment-${draft.localId}`}
@@ -605,7 +605,7 @@ export function TransactionsPage() {
           <h2 className="text-xl font-bold">{t(locale, "transactions")}</h2>
           <ReceiptText className="h-5 w-5 text-teal-600 dark:text-teal-300" />
         </div>
-        <div className="mt-4 space-y-1.5">
+          <div className="mt-3 space-y-1.5">
           {transactions.map((transaction) => (
             <div key={transaction.id} className="rounded-xl border border-slate-200 px-3 py-2 dark:border-white/10">
               <div className="flex items-center gap-2">

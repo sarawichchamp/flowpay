@@ -11,6 +11,8 @@ const kanit = Kanit({
   weight: ["300", "400", "500", "600", "700"]
 });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "FlowPay",
   description: "Shared food wallet and settlement app for couples",

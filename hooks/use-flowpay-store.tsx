@@ -170,6 +170,7 @@ export function FlowPayStoreProvider({
       setTransactions(payload.transactions);
       setInstallments(payload.installments);
       setCategories(payload.categories);
+      setTransactionTypePresets(payload.transactionTypePresets);
     }
 
     function queueSync() {
@@ -188,6 +189,8 @@ export function FlowPayStoreProvider({
       .on("postgres_changes", { event: "*", schema: "public", table: "installments" }, queueSync)
       .on("postgres_changes", { event: "*", schema: "public", table: "billing_cycles" }, queueSync)
       .subscribe();
+
+    void syncFromServer();
 
     return () => {
       cancelled = true;
