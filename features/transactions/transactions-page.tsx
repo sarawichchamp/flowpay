@@ -509,7 +509,7 @@ export function TransactionsPage() {
                     disabled={drafts.length === 1}
                   >
                     <Trash2 className="h-4 w-4" />
-                    <span className="sm:hidden">{t(locale, "delete")}</span>
+                    <span className="sm:hidden">{copy.delete}</span>
                     <span className="hidden sm:inline">{copy.removeRow}</span>
                   </Button>
                 </div>
