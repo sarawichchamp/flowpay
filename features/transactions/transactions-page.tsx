@@ -167,7 +167,7 @@ function AttachmentPicker({
   onChange: (file?: File) => void;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-2">
       <label
         htmlFor={inputId}
         className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white/70 px-3 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition hover:bg-white dark:bg-white/10 dark:text-white dark:ring-white/10"
@@ -399,14 +399,14 @@ export function TransactionsPage() {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-      <Card>
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
+    <div className="grid gap-3 xl:grid-cols-[0.92fr_1.08fr]">
+      <Card className="overflow-hidden p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
             <Plus className="h-5 w-5" />
           </div>
-          <div>
-            <h1 className="text-xl font-bold">{editingTransactionId ? copy.editTitle : copy.addTitle}</h1>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold sm:text-xl">{editingTransactionId ? copy.editTitle : copy.addTitle}</h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
           </div>
         </div>
@@ -480,12 +480,12 @@ export function TransactionsPage() {
               disabled={isSaving}
               onChange={setEditAttachment}
             />
-            <div className="grid grid-cols-[auto_1fr_auto] gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Button type="button" variant="ghost" onClick={resetEditForm}>
                 <X className="h-4 w-4" />
                 {copy.cancelEdit}
               </Button>
-              <div />
+              <div className="hidden flex-1 sm:block" />
               <Button type="submit" disabled={isSaving}>
                 {copy.update}
               </Button>
@@ -496,7 +496,7 @@ export function TransactionsPage() {
           <form className="mt-4 space-y-2.5" onSubmit={handleBatchSubmit}>
             {drafts.map((draft, index) => (
               <div key={draft.localId} className="rounded-xl border border-slate-200 p-2.5 dark:border-white/10">
-                <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                     {copy.rowLabel} {index + 1}
                   </p>
@@ -504,11 +504,13 @@ export function TransactionsPage() {
                     type="button"
                     size="sm"
                     variant="ghost"
+                    className="shrink-0 px-2"
                     onClick={() => removeRow(draft.localId)}
                     disabled={drafts.length === 1}
                   >
                     <Trash2 className="h-4 w-4" />
-                    {copy.removeRow}
+                    <span className="sm:hidden">{t(locale, "delete")}</span>
+                    <span className="hidden sm:inline">{copy.removeRow}</span>
                   </Button>
                 </div>
                 <div className="grid gap-2.5 md:grid-cols-[1.3fr_0.75fr_0.75fr]">
@@ -582,15 +584,15 @@ export function TransactionsPage() {
                 </div>
               </div>
             ))}
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-[auto_auto_1fr_auto]">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[auto_auto_1fr_auto]">
               <Button type="button" variant="ghost" onClick={() => (mode === "demo" ? resetDemoData() : resetBatchForm())}>
                 {copy.reset}
               </Button>
               <Button type="button" variant="secondary" onClick={addRow}>
                 <Plus className="h-4 w-4" />
-                  {copy.addRow}
-                </Button>
-              <div className="hidden md:block" />
+                {copy.addRow}
+              </Button>
+              <div className="hidden xl:block" />
               <Button type="submit" disabled={isSaving}>
                 {copy.saveAll}
               </Button>
@@ -600,47 +602,49 @@ export function TransactionsPage() {
         )}
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden p-4 sm:p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">{t(locale, "transactions")}</h2>
+          <h2 className="text-lg font-bold sm:text-xl">{t(locale, "transactions")}</h2>
           <ReceiptText className="h-5 w-5 text-teal-600 dark:text-teal-300" />
         </div>
-          <div className="mt-3 space-y-1.5">
+        <div className="mt-3 space-y-1.5">
           {transactions.map((transaction) => (
             <div key={transaction.id} className="rounded-xl border border-slate-200 px-3 py-2 dark:border-white/10">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">
-                    {transaction.title}
-                    <span className="ml-2 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  <p className="truncate text-sm font-semibold">{transaction.title}</p>
+                  <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
                       {formatShortDate(transaction.date)} · {transaction.transactionType}
                       {transaction.transactionType !== "food" ? ` · ${transaction.splitType}` : ""}
                       {transaction.attachmentUrl ? " · att" : ""}
-                    </span>
                   </p>
                 </div>
-                {editingTransactionId === transaction.id ? (
-                  <span className="shrink-0 text-[10px] font-semibold text-teal-600 dark:text-teal-300">{copy.editingBadge}</span>
-                ) : null}
-                <p className="shrink-0 text-sm font-black tabular-nums">{formatTHB(transaction.amount)}</p>
-                {transaction.transactionType === "installment" ? (
-                  <span className="shrink-0 text-[10px] text-slate-500 dark:text-slate-400">lock</span>
-                ) : (
-                  <div className="flex shrink-0 gap-1">
-                    <Button type="button" size="sm" variant="secondary" className="px-2" onClick={() => startEditing(transaction)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="px-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
-                      onClick={() => void handleDelete(transaction)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <div className="flex items-center gap-2">
+                    {editingTransactionId === transaction.id ? (
+                      <span className="shrink-0 text-[10px] font-semibold text-teal-600 dark:text-teal-300">{copy.editingBadge}</span>
+                    ) : null}
+                    <p className="shrink-0 text-sm font-black tabular-nums">{formatTHB(transaction.amount)}</p>
                   </div>
-                )}
+                  {transaction.transactionType === "installment" ? (
+                    <span className="shrink-0 text-[10px] text-slate-500 dark:text-slate-400">lock</span>
+                  ) : (
+                    <div className="flex shrink-0 gap-1">
+                      <Button type="button" size="sm" variant="secondary" className="px-2" onClick={() => startEditing(transaction)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="px-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                        onClick={() => void handleDelete(transaction)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}
