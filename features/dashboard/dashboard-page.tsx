@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { eachDayOfInterval, format, parseISO } from "date-fns";
 import { motion } from "framer-motion";
 import { CalendarDays, ChevronDown, PieChart as PieChartIcon, TrendingDown, Wallet, X } from "lucide-react";
-import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { SummaryRow } from "@/features/settlement/types";
@@ -33,6 +33,13 @@ export function DashboardPage() {
   const [chartsReady, setChartsReady] = useState(false);
   const [detailsModalType, setDetailsModalType] = useState<"food" | "other" | "installment" | null>(null);
   const [historicalSummaries, setHistoricalSummaries] = useState<SummaryRow[]>([]);
+  const [dailyChartXZoom, setDailyChartXZoom] = useState(1);
+  const [dailyChartYZoom, setDailyChartYZoom] = useState(1);
+  const dailyChartScrollRef = useRef<HTMLDivElement | null>(null);
+  const dailyChartYAxisZoomRef = useRef<HTMLDivElement | null>(null);
+  const dailyChartXAxisZoomRef = useRef<HTMLDivElement | null>(null);
+  const dailyChartDragRef = useRef<{ pointerId: number; startX: number; scrollLeft: number } | null>(null);
+  const dailyChartTouchRef = useRef<{ axis: "x" | "y"; lastX: number; lastY: number; pinchDistance: number | null } | null>(null);
 
   const monthlySummaryLink =
     locale === "th"
@@ -206,10 +213,11 @@ export function DashboardPage() {
         day: format(day, locale === "th" ? "d MMM" : "MMM d"),
         quota: dailyFoodQuota,
         spent,
-        delta: roundMoney(spent - dailyFoodQuota)
+        delta: roundMoney(spent - dailyFoodQuota),
+        average: settlement.food.averageDailySpending
       };
     });
-  }, [currentCycle.endDate, currentCycle.startDate, dailyFoodQuota, foodTransactions, locale]);
+  }, [currentCycle.endDate, currentCycle.startDate, dailyFoodQuota, foodTransactions, locale, settlement.food.averageDailySpending]);
 
   const todayFoodSpent = dailyFoodData.find((item) => item.dateKey === todayDateKey)?.spent ?? 0;
   const todayFoodDelta = roundMoney(todayFoodSpent - dailyFoodQuota);
@@ -267,6 +275,152 @@ export function DashboardPage() {
     return monthlyExpenseDataFromTransactions;
   }, [historicalSummaries, locale, mode, monthlyExpenseDataFromTransactions]);
 
+  const dailyChartPeak = useMemo(
+    () =>
+      Math.max(
+        1,
+        ...dailyFoodData.map((item) => Math.max(item.spent, item.quota, item.average))
+      ),
+    [dailyFoodData]
+  );
+  const dailyChartDomainMax = Math.max(Math.ceil((dailyChartPeak * 1.15) / dailyChartYZoom), 1);
+  const dailyChartWidth = Math.max(640, Math.round(dailyFoodData.length * 44 * dailyChartXZoom));
+
+  function clampZoom(value: number, min: number, max: number) {
+    return Math.min(max, Math.max(min, Number(value.toFixed(2))));
+  }
+
+  function adjustDailyChartXZoom(delta: number) {
+    setDailyChartXZoom((current) => clampZoom(current + delta, 1, 4));
+  }
+
+  function adjustDailyChartYZoom(delta: number) {
+    setDailyChartYZoom((current) => clampZoom(current + delta, 1, 4));
+  }
+
+  function handleDailyChartWheel(axis: "x" | "y", delta: number) {
+    if (axis === "x") {
+      adjustDailyChartXZoom(delta > 0 ? -0.2 : 0.2);
+      return;
+    }
+
+    adjustDailyChartYZoom(delta > 0 ? -0.2 : 0.2);
+  }
+
+  function handleDailyChartWheelEvent(axis: "x" | "y", event: React.WheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    handleDailyChartWheel(axis, event.deltaY);
+  }
+
+  useEffect(() => {
+    const yElement = dailyChartYAxisZoomRef.current;
+    const xElement = dailyChartXAxisZoomRef.current;
+
+    const bindNativeWheel = (element: HTMLDivElement | null, axis: "x" | "y") => {
+      if (!element) return () => undefined;
+
+      const listener = (event: WheelEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handleDailyChartWheel(axis, event.deltaY);
+      };
+
+      element.addEventListener("wheel", listener, { passive: false });
+      return () => {
+        element.removeEventListener("wheel", listener);
+      };
+    };
+
+    const unbindY = bindNativeWheel(yElement, "y");
+    const unbindX = bindNativeWheel(xElement, "x");
+
+    return () => {
+      unbindY();
+      unbindX();
+    };
+  }, []);
+
+  function handleDailyChartTouchStart(axis: "x" | "y", event: React.TouchEvent<HTMLDivElement>) {
+    if (event.touches.length >= 2) {
+      const first = event.touches[0];
+      const second = event.touches[1];
+      const pinchDistance = axis === "x" ? Math.abs(second.clientX - first.clientX) : Math.abs(second.clientY - first.clientY);
+      dailyChartTouchRef.current = { axis, lastX: first.clientX, lastY: first.clientY, pinchDistance };
+      return;
+    }
+
+    const touch = event.touches[0];
+    if (!touch) return;
+    dailyChartTouchRef.current = { axis, lastX: touch.clientX, lastY: touch.clientY, pinchDistance: null };
+  }
+
+  function handleDailyChartTouchMove(axis: "x" | "y", event: React.TouchEvent<HTMLDivElement>) {
+    const state = dailyChartTouchRef.current;
+    if (!state || state.axis !== axis) return;
+
+    if (event.touches.length >= 2) {
+      event.preventDefault();
+      const first = event.touches[0];
+      const second = event.touches[1];
+      const nextDistance = axis === "x" ? Math.abs(second.clientX - first.clientX) : Math.abs(second.clientY - first.clientY);
+      const previousDistance = state.pinchDistance ?? nextDistance;
+      const delta = nextDistance - previousDistance;
+
+      if (axis === "x") {
+        adjustDailyChartXZoom(delta / 120);
+      } else {
+        adjustDailyChartYZoom(delta / 120);
+      }
+
+      dailyChartTouchRef.current = { ...state, pinchDistance: nextDistance };
+      return;
+    }
+
+    const touch = event.touches[0];
+    if (!touch) return;
+    event.preventDefault();
+    const delta = axis === "x" ? touch.clientX - state.lastX : touch.clientY - state.lastY;
+
+    if (axis === "x") {
+      adjustDailyChartXZoom(delta / 120);
+    } else {
+      adjustDailyChartYZoom(-delta / 120);
+    }
+
+    dailyChartTouchRef.current = { ...state, lastX: touch.clientX, lastY: touch.clientY };
+  }
+
+  function handleDailyChartTouchEnd() {
+    dailyChartTouchRef.current = null;
+  }
+
+  function handleDailyChartPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    const container = dailyChartScrollRef.current;
+    if (!container) return;
+    dailyChartDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      scrollLeft: container.scrollLeft
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleDailyChartPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const container = dailyChartScrollRef.current;
+    const dragState = dailyChartDragRef.current;
+    if (!container || !dragState || dragState.pointerId !== event.pointerId) return;
+    container.scrollLeft = dragState.scrollLeft - (event.clientX - dragState.startX);
+  }
+
+  function handleDailyChartPointerEnd(event: React.PointerEvent<HTMLDivElement>) {
+    if (dailyChartDragRef.current?.pointerId !== event.pointerId) return;
+    dailyChartDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
   const copy =
     locale === "th"
       ? {
@@ -287,7 +441,8 @@ export function DashboardPage() {
           dailyQuotaChart: "โควต้าอาหารรายวัน",
           dailyQuotaHint: "เทียบโควต้าต่อวันกับค่าอาหารที่ใช้จริง เพื่อดูว่าวันไหนกินต่ำหรือเกินงบ",
           dailySpentSeries: "ใช้จริง",
-          dailyQuotaSeries: "โควต้า",
+          dailyQuotaSeries: "เส้นโควต้า",
+          dailyAverageSeries: "เส้นเฉลี่ยทั้งรอบ",
           overBudget: "เกินโควต้า",
           underBudget: "ต่ำกว่าโควต้า",
           overBudgetHighlight: "สีส้มแดง = วันเกินโควต้า",
@@ -317,7 +472,8 @@ export function DashboardPage() {
           dailyQuotaChart: "Daily food quota",
           dailyQuotaHint: "Compare each day's food quota with actual spending to spot days that run under or over budget.",
           dailySpentSeries: "Spent",
-          dailyQuotaSeries: "Quota",
+          dailyQuotaSeries: "Quota line",
+          dailyAverageSeries: "Cycle average line",
           overBudget: "Over quota",
           underBudget: "Under quota",
           overBudgetHighlight: "Orange-red bars mark days that go over quota",
@@ -544,7 +700,7 @@ export function DashboardPage() {
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
               <span className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-slate-300" />
+                <span className="h-0.5 w-5 rounded-full bg-slate-400" />
                 {copy.dailyQuotaSeries}
               </span>
               <span className="flex items-center gap-2">
@@ -555,33 +711,83 @@ export function DashboardPage() {
                 <span className="h-3 w-3 rounded-full bg-orange-500" />
                 {copy.overBudgetHighlight}
               </span>
+              <span className="flex items-center gap-2">
+                <span className="h-0.5 w-5 rounded-full bg-cyan-500" />
+                {copy.dailyAverageSeries}
+              </span>
             </div>
           </div>
-          <div className="mt-4 h-72 min-w-0 pointer-events-none md:pointer-events-auto">
-            {chartsReady ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyFoodData} barCategoryGap={10}>
-                  <XAxis dataKey="day" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
-                  <Tooltip
-                    cursor={false}
-                    formatter={(value, name, entry) => {
-                      if (name === "quota") return [formatTHB(Number(value ?? 0)), copy.dailyQuotaSeries];
-                      const delta = Number(entry?.payload?.delta ?? 0);
-                      const deltaLabel = delta > 0 ? copy.overBudget : copy.underBudget;
-                      return [`${formatTHB(Number(value ?? 0))} (${deltaLabel} ${formatTHB(Math.abs(delta))})`, copy.dailySpentSeries];
-                    }}
-                    labelFormatter={(label) => `${copy.dailyQuotaChart}: ${label}`}
-                  />
-                  <Bar dataKey="quota" fill="#cbd5e1" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="spent" radius={[8, 8, 0, 0]}>
-                    {dailyFoodData.map((entry) => (
-                      <Cell key={entry.dateKey} fill={entry.delta > 0 ? "#f97316" : "#14b8a6"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : null}
+          <div className="mt-3 flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span>{locale === "th" ? "ซูมแกนซ้าย: ล้อเมาส์หรือปัดขึ้นลง" : "Left axis: wheel or swipe up/down to zoom vertically"}</span>
+            <span>{locale === "th" ? "ซูมแกนล่าง: ล้อเมาส์หรือปัดซ้ายขวา" : "Bottom axis: wheel or swipe left/right to zoom horizontally"}</span>
+          </div>
+          <div className="mt-4 grid h-72 min-w-0 grid-cols-[44px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_40px] gap-2">
+            <div
+              ref={dailyChartYAxisZoomRef}
+              className="row-span-1 flex cursor-ns-resize items-center justify-center rounded-2xl bg-slate-50 text-[11px] font-semibold text-slate-500 select-none dark:bg-white/5 dark:text-slate-400"
+              onWheel={(event) => handleDailyChartWheelEvent("y", event)}
+              onTouchStart={(event) => handleDailyChartTouchStart("y", event)}
+              onTouchMove={(event) => handleDailyChartTouchMove("y", event)}
+              onTouchEnd={handleDailyChartTouchEnd}
+              style={{ touchAction: "none" }}
+            >
+              {locale === "th" ? "ซูม Y" : "Zoom Y"}
+            </div>
+            <div
+              ref={dailyChartScrollRef}
+              className="min-w-0 overflow-x-auto overflow-y-hidden rounded-2xl cursor-grab active:cursor-grabbing"
+              onPointerDown={handleDailyChartPointerDown}
+              onPointerMove={handleDailyChartPointerMove}
+              onPointerUp={handleDailyChartPointerEnd}
+              onPointerCancel={handleDailyChartPointerEnd}
+            >
+              <div style={{ width: dailyChartWidth, height: "100%" }}>
+                {chartsReady ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={dailyFoodData} barCategoryGap={10}>
+                      <XAxis dataKey="day" axisLine={false} tickLine={false} minTickGap={0} />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        allowDataOverflow
+                        domain={[0, dailyChartDomainMax]}
+                        tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
+                      />
+                      <Tooltip
+                        cursor={false}
+                        formatter={(value, name, entry) => {
+                          if (name === "quota") return [formatTHB(Number(value ?? 0)), copy.dailyQuotaSeries];
+                          if (name === "average") return [formatTHB(Number(value ?? 0)), copy.dailyAverageSeries];
+                          const delta = Number(entry?.payload?.delta ?? 0);
+                          const deltaLabel = delta > 0 ? copy.overBudget : copy.underBudget;
+                          return [`${formatTHB(Number(value ?? 0))} (${deltaLabel} ${formatTHB(Math.abs(delta))})`, copy.dailySpentSeries];
+                        }}
+                        labelFormatter={(label) => `${copy.dailyQuotaChart}: ${label}`}
+                      />
+                      <Line type="monotone" dataKey="quota" stroke="#94a3b8" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} name="quota" />
+                      <Line type="monotone" dataKey="average" stroke="#06b6d4" strokeWidth={2.5} strokeDasharray="6 6" dot={false} activeDot={{ r: 4 }} name="average" />
+                      <Bar dataKey="spent" radius={[8, 8, 0, 0]} name="spent">
+                        {dailyFoodData.map((entry) => (
+                          <Cell key={entry.dateKey} fill={entry.delta > 0 ? "#f97316" : "#14b8a6"} />
+                        ))}
+                      </Bar>
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : null}
+              </div>
+            </div>
+            <div className="row-start-2" />
+            <div
+              ref={dailyChartXAxisZoomRef}
+              className="row-start-2 flex cursor-ew-resize items-center justify-center rounded-2xl bg-slate-50 text-[11px] font-semibold text-slate-500 select-none dark:bg-white/5 dark:text-slate-400"
+              onWheel={(event) => handleDailyChartWheelEvent("x", event)}
+              onTouchStart={(event) => handleDailyChartTouchStart("x", event)}
+              onTouchMove={(event) => handleDailyChartTouchMove("x", event)}
+              onTouchEnd={handleDailyChartTouchEnd}
+              style={{ touchAction: "none" }}
+            >
+              {locale === "th" ? "ซูม X / ลากเลื่อนกราฟ" : "Zoom X / drag to pan"}
+            </div>
           </div>
         </Card>
       </section>
