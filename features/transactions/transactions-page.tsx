@@ -10,6 +10,7 @@ import { useFlowPayStore } from "@/hooks/use-flowpay-store";
 import { useLocale } from "@/hooks/use-locale";
 import { t } from "@/i18n/dictionary";
 import type { SplitType, Transaction, TransactionType, TransactionTypePreset } from "@/types/domain";
+import { cn } from "@/utils/cn";
 import { formatTHB } from "@/utils/currency";
 import { formatShortDate, getCurrentDateStringInTimeZone } from "@/utils/date";
 import { transactionAttachmentFileSchema } from "@/utils/validation";
@@ -642,17 +643,18 @@ export function TransactionsPage() {
                   ) : (
                     <div className="flex shrink-0 gap-1">
                       {transaction.attachmentUrl ? (
-                        <Button
-                          asChild
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          className="px-2"
+                        <a
+                          href={transaction.attachmentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={copy.openAttachment}
+                          className={cn(
+                            "inline-flex h-9 items-center justify-center gap-2 rounded-2xl bg-white/70 px-2 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition active:scale-[0.98] hover:bg-white",
+                            "dark:bg-white/10 dark:text-white dark:ring-white/10"
+                          )}
                         >
-                          <a href={transaction.attachmentUrl} target="_blank" rel="noreferrer" aria-label={copy.openAttachment}>
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </Button>
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
                       ) : null}
                       <Button type="button" size="sm" variant="secondary" className="px-2" onClick={() => startEditing(transaction)}>
                         <Pencil className="h-4 w-4" />
