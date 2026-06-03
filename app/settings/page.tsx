@@ -117,10 +117,16 @@ function formatDateTime(locale: "th" | "en", value?: string) {
   }).format(new Date(value));
 }
 
+function isPasskeysDisabledError(error: unknown) {
+  return error instanceof Error && error.message.toLowerCase().includes("passkeys are disabled");
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const { locale } = useLocale();
   const copy = settingsCopy(locale);
+  const passkeysUnavailableMessage =
+    locale === "th" ? "โปรเจ็กต์นี้ยังไม่ได้เปิดใช้งาน Passkeys ในระบบหลังบ้าน" : "Passkeys are not enabled for this project yet.";
   const { transactionTypePresets, addTransactionTypePreset, updateTransactionTypePreset, deleteTransactionTypePreset } = useFlowPayStore();
   const [label, setLabel] = useState("");
   const [baseType, setBaseType] = useState<TransactionTypePresetBaseType>("normal");
@@ -133,6 +139,7 @@ export default function SettingsPage() {
   const [busyPasskeyId, setBusyPasskeyId] = useState<string | null>(null);
   const [creatingPasskey, setCreatingPasskey] = useState(false);
   const [currentEmail, setCurrentEmail] = useState("");
+  const [passkeysEnabled, setPasskeysEnabled] = useState(true);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
@@ -173,18 +180,26 @@ export default function SettingsPage() {
   async function loadPasskeys() {
     setLoadingPasskeys(true);
     setSecurityError("");
+    setPasskeysEnabled(true);
 
     try {
       const supabase = createClient();
-      const [{ data: userResult, error: userError }, { data: passkeyResult, error: passkeyError }] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase.auth.passkey.list()
-      ]);
+      const { data: userResult, error: userError } = await supabase.auth.getUser();
 
       if (userError) throw userError;
-      if (passkeyError) throw passkeyError;
-
       setCurrentEmail(userResult.user?.email ?? "");
+
+      const { data: passkeyResult, error: passkeyError } = await supabase.auth.passkey.list();
+      if (passkeyError) {
+        if (isPasskeysDisabledError(passkeyError)) {
+          setPasskeys([]);
+          setPasskeysEnabled(false);
+          return;
+        }
+
+        throw passkeyError;
+      }
+
       setPasskeys(passkeyResult ?? []);
     } catch (loadError: unknown) {
       setSecurityError(loadError instanceof Error ? loadError.message : copy.securityError);
@@ -203,6 +218,11 @@ export default function SettingsPage() {
     setSecurityMessage("");
 
     try {
+      if (!passkeysEnabled) {
+        setSecurityMessage(passkeysUnavailableMessage);
+        return;
+      }
+
       const supabase = createClient();
       const { error: registerError } = await supabase.auth.registerPasskey();
 
@@ -304,7 +324,11 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-5 flex flex-wrap gap-3">
-          <Button type="button" onClick={() => void handleRegisterPasskey()} disabled={creatingPasskey || loadingPasskeys || passwordLoading}>
+          <Button
+            type="button"
+            onClick={() => void handleRegisterPasskey()}
+            disabled={creatingPasskey || loadingPasskeys || passwordLoading || !passkeysEnabled}
+          >
             <Fingerprint className="h-4 w-4" />
             {copy.registerPasskey}
           </Button>
@@ -373,7 +397,7 @@ export default function SettingsPage() {
                   variant="ghost"
                   className="text-red-500"
                   onClick={() => void handleDeletePasskey(passkey.id)}
-                  disabled={busyPasskeyId === passkey.id}
+                  disabled={busyPasskeyId === passkey.id || !passkeysEnabled}
                 >
                   <Trash2 className="h-4 w-4" />
                   {copy.removePasskey}
@@ -385,6 +409,7 @@ export default function SettingsPage() {
           )}
         </div>
 
+        {!passkeysEnabled ? <p className="mt-4 text-sm text-amber-600 dark:text-amber-300">{passkeysUnavailableMessage}</p> : null}
         {securityError ? <p className="mt-4 text-sm text-red-500">{securityError}</p> : null}
         {!securityError && securityMessage ? <p className="mt-4 text-sm text-teal-600 dark:text-teal-300">{securityMessage}</p> : null}
       </Card>
