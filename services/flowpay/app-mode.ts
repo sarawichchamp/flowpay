@@ -1,4 +1,3 @@
-import { isHouseholdMembersConfigured } from "@/services/flowpay/household-members";
 import { isSupabaseAdminConfigured } from "@/services/supabase/admin";
 
 export function isSupabaseConfigured() {
@@ -17,5 +16,5 @@ export function getAppMode(): AppMode {
     return "demo";
   }
 
-  return isSupabaseConfigured() && isSupabaseAdminConfigured() && isHouseholdMembersConfigured() ? "production" : "demo";
+  return isSupabaseConfigured() && isSupabaseAdminConfigured() ? "production" : "demo";
 }

@@ -21,8 +21,12 @@ export function isConfiguredHouseholdMemberEmail(email?: string | null) {
   const normalizedEmail = email?.trim().toLowerCase();
   const members = getConfiguredHouseholdMembers();
 
-  if (!normalizedEmail || !members) {
+  if (!normalizedEmail) {
     return false;
+  }
+
+  if (!members) {
+    return true;
   }
 
   return members.some((member) => member.email === normalizedEmail);

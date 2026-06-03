@@ -2,7 +2,7 @@ import { categories, currentCycle, installments, transactionTypePresets, transac
 import { FlowPayRepository } from "@/repositories/flowpay-repository";
 import { getAppMode } from "@/services/flowpay/app-mode";
 import { defaultCarryOverAmount, defaultFoodBudgetTarget, householdPayrollDay } from "@/services/flowpay/config";
-import { getProductionHouseholdMembersOrThrow } from "@/services/flowpay/household-members";
+import { getConfiguredHouseholdMembers } from "@/services/flowpay/household-members";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/services/supabase/admin";
 import type { FlowPayBootstrap } from "@/types/flowpay-store";
 import { getBillingCycleFromPayrollDate } from "@/utils/billing-cycle";
@@ -11,7 +11,7 @@ import { getCurrentDateInTimeZone } from "@/utils/date";
 let householdSetupPromise: Promise<void> | null = null;
 
 async function ensureHouseholdSetup(repository: FlowPayRepository) {
-  const configuredMembers = getProductionHouseholdMembersOrThrow();
+  const configuredMembers = getConfiguredHouseholdMembers();
   let profiles = await repository.getHouseholdProfiles();
   let activeCycle = await repository.getCurrentBillingCycle();
   const categoryRows = await repository.getCategories();
@@ -44,33 +44,39 @@ async function ensureHouseholdSetup(repository: FlowPayRepository) {
         .map((user) => [(user.email as string).toLowerCase(), user])
     );
 
-    for (const member of configuredMembers) {
-      const authUser = existingUsersByEmail.get(member.email);
+    if (configuredMembers) {
+      for (const member of configuredMembers) {
+        const authUser = existingUsersByEmail.get(member.email);
 
-      if (!authUser) {
-        throw new Error(
-          `Missing Supabase Auth user for ${member.email}. Create this user manually in Supabase Auth before starting FlowPay production mode.`
-        );
-      }
-
-      const { error: profileError } = await supabase.from("profiles").upsert(
-        {
-          id: authUser.id,
-          display_name: member.displayName,
-          email: authUser.email ?? member.email,
-          avatar_url: null
-        },
-        {
-          onConflict: "id"
+        if (!authUser) {
+          throw new Error(
+            `Missing Supabase Auth user for ${member.email}. Create this user manually in Supabase Auth before starting FlowPay production mode.`
+          );
         }
-      );
 
-      if (profileError) {
-        throw profileError;
+        const { error: profileError } = await supabase.from("profiles").upsert(
+          {
+            id: authUser.id,
+            display_name: member.displayName,
+            email: authUser.email ?? member.email,
+            avatar_url: null
+          },
+          {
+            onConflict: "id"
+          }
+        );
+
+        if (profileError) {
+          throw profileError;
+        }
       }
-    }
 
-    profiles = await repository.getHouseholdProfiles();
+      profiles = await repository.getHouseholdProfiles();
+    } else if (profiles.length < 2) {
+      throw new Error(
+        "FlowPay household setup is incomplete. Configure FLOWPAY_MEMBER_1_* and FLOWPAY_MEMBER_2_* or create both household profiles first."
+      );
+    }
   }
 
   const existingDefaultCategoryNames = new Set(categoryRows.filter((category) => category.isDefault).map((category) => category.name));
