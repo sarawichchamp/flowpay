@@ -206,12 +206,28 @@ export function TransactionsPage() {
   const [drafts, setDrafts] = useState<DraftTransaction[]>([createDraftTransaction(users[0].id, transactionTypePresets)]);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<DraftTransaction>(createDraftTransaction(users[0].id, transactionTypePresets, "edit-draft"));
+  const [previewAttachmentUrl, setPreviewAttachmentUrl] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setDrafts((current) => (current.length ? current : [createDraftTransaction(users[0].id, transactionTypePresets)]));
   }, [transactionTypePresets, users]);
+
+  useEffect(() => {
+    if (!previewAttachmentUrl) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [previewAttachmentUrl]);
 
   function resetBatchForm() {
     setDrafts([createDraftTransaction(users[0].id, transactionTypePresets)]);
@@ -407,6 +423,9 @@ export function TransactionsPage() {
       setSubmitError(error instanceof Error ? error.message : copy.deleteFailed);
     }
   }
+
+  const previewIsPdf = previewAttachmentUrl?.toLowerCase().includes(".pdf") ?? false;
+  const previewFileName = getAttachmentName(previewAttachmentUrl);
 
   return (
     <div className="grid gap-3 xl:grid-cols-[0.92fr_1.08fr]">
@@ -643,18 +662,17 @@ export function TransactionsPage() {
                   ) : (
                     <div className="flex shrink-0 gap-1">
                       {transaction.attachmentUrl ? (
-                        <a
-                          href={transaction.attachmentUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
                           aria-label={copy.openAttachment}
+                          onClick={() => setPreviewAttachmentUrl(transaction.attachmentUrl ?? null)}
                           className={cn(
                             "inline-flex h-9 items-center justify-center gap-2 rounded-2xl bg-white/70 px-2 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition active:scale-[0.98] hover:bg-white",
                             "dark:bg-white/10 dark:text-white dark:ring-white/10"
                           )}
                         >
                           <ExternalLink className="h-4 w-4" />
-                        </a>
+                        </button>
                       ) : null}
                       <Button type="button" size="sm" variant="secondary" className="px-2" onClick={() => startEditing(transaction)}>
                         <Pencil className="h-4 w-4" />
@@ -676,6 +694,43 @@ export function TransactionsPage() {
           ))}
         </div>
       </Card>
+
+      {previewAttachmentUrl ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm" onClick={() => setPreviewAttachmentUrl(null)}>
+          <Card className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden p-0" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-white/10">
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-bold">{previewFileName || copy.openAttachment}</h3>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{previewIsPdf ? "PDF preview" : "Image preview"}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewAttachmentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(
+                    "inline-flex h-9 items-center justify-center gap-2 rounded-2xl bg-white/70 px-3 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition hover:bg-white",
+                    "dark:bg-white/10 dark:text-white dark:ring-white/10"
+                  )}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  {copy.openAttachment}
+                </a>
+                <Button type="button" size="sm" variant="ghost" className="px-2" onClick={() => setPreviewAttachmentUrl(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="bg-slate-100 p-3 dark:bg-slate-950">
+              {previewIsPdf ? (
+                <iframe title={previewFileName || copy.openAttachment} src={previewAttachmentUrl} className="h-[72vh] w-full rounded-2xl bg-white" />
+              ) : (
+                <img src={previewAttachmentUrl} alt={previewFileName || copy.openAttachment} className="max-h-[72vh] w-full rounded-2xl object-contain bg-black/5" />
+              )}
+            </div>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }
