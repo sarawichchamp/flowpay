@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Camera, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
+import { Camera, ExternalLink, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
@@ -641,6 +641,19 @@ export function TransactionsPage() {
                     <span className="shrink-0 text-[10px] text-slate-500 dark:text-slate-400">lock</span>
                   ) : (
                     <div className="flex shrink-0 gap-1">
+                      {transaction.attachmentUrl ? (
+                        <Button
+                          asChild
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="px-2"
+                        >
+                          <a href={transaction.attachmentUrl} target="_blank" rel="noreferrer" aria-label={copy.openAttachment}>
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      ) : null}
                       <Button type="button" size="sm" variant="secondary" className="px-2" onClick={() => startEditing(transaction)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
