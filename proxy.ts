@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAppMode } from "@/services/flowpay/app-mode";
-import { householdAccessCookieName, isHouseholdAccessConfigured } from "@/services/flowpay/access";
+import { isAuthenticatedHouseholdMember } from "@/services/flowpay/auth";
+import { updateSession } from "@/services/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
-  const response = NextResponse.next({ request });
+  const { response, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
   const requiresReauth = request.nextUrl.searchParams.get("reauth") === "1";
   const isUnlockRoute = pathname.startsWith("/unlock");
@@ -11,18 +12,42 @@ export async function proxy(request: NextRequest) {
   const isAuthRoute = pathname.startsWith("/auth");
   const isProtectedRoute = !isUnlockRoute && !isApiRoute && !isAuthRoute;
 
-  if (getAppMode() === "production" && isHouseholdAccessConfigured()) {
-    const accessCookie = request.cookies.get(householdAccessCookieName)?.value;
+  if (getAppMode() === "production") {
+    const hasSupabaseSession = Boolean(user);
 
-    if (!accessCookie && isProtectedRoute) {
-      const unlockUrl = request.nextUrl.clone();
-      unlockUrl.pathname = "/unlock";
-      return NextResponse.redirect(unlockUrl);
+    if (!hasSupabaseSession && isProtectedRoute) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/auth/login";
+      loginUrl.searchParams.set("next", pathname === "/" ? "/" : `${pathname}${request.nextUrl.search}`);
+      return NextResponse.redirect(loginUrl);
     }
 
-    if (accessCookie && !requiresReauth && (isUnlockRoute || pathname === "/auth/login")) {
+    if (hasSupabaseSession) {
+      const userId = user?.id;
+      const nextPath = request.nextUrl.searchParams.get("next") ?? "/";
+
+      if (userId) {
+        const isMember = await isAuthenticatedHouseholdMember(userId, user?.email).catch(() => false);
+
+        if (!isMember && isProtectedRoute) {
+          const loginUrl = request.nextUrl.clone();
+          loginUrl.pathname = "/auth/login";
+          loginUrl.searchParams.set("error", "not-member");
+          return NextResponse.redirect(loginUrl);
+        }
+      }
+      if (!requiresReauth && (isUnlockRoute || pathname === "/auth/login")) {
+        const homeUrl = request.nextUrl.clone();
+        homeUrl.pathname = nextPath.startsWith("/") ? nextPath : "/";
+        homeUrl.search = "";
+        return NextResponse.redirect(homeUrl);
+      }
+    }
+
+    if (pathname === "/unlock") {
       const homeUrl = request.nextUrl.clone();
-      homeUrl.pathname = "/";
+      homeUrl.pathname = "/auth/login";
+      homeUrl.search = request.nextUrl.search;
       return NextResponse.redirect(homeUrl);
     }
   }

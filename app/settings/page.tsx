@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Fingerprint, KeyRound, LogOut, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
@@ -10,7 +11,15 @@ import { Input } from "@/components/ui/input";
 import { useFlowPayStore } from "@/hooks/use-flowpay-store";
 import { useLocale } from "@/hooks/use-locale";
 import { t } from "@/i18n/dictionary";
+import { createClient } from "@/services/supabase/browser";
 import type { TransactionTypePresetBaseType } from "@/types/domain";
+
+type PasskeyItem = {
+  id: string;
+  friendly_name?: string;
+  created_at: string;
+  last_used_at?: string;
+};
 
 function settingsCopy(locale: "th" | "en") {
   return locale === "th"
@@ -31,7 +40,30 @@ function settingsCopy(locale: "th" | "en") {
         cancelEdit: "ยกเลิกแก้ไข",
         emptyPreset: "ยังไม่มีประเภทที่ตั้งไว้",
         deletePreset: "ลบ",
-        saveFailed: "กรุณาใส่ชื่อประเภทก่อนบันทึก"
+        saveFailed: "กรุณาใส่ชื่อประเภทก่อนบันทึก",
+        securityTitle: "ความปลอดภัยของบัญชี",
+        securityHint: "เพิ่ม passkey ไว้ใช้สแกนลายนิ้วมือหรือ Face ID ในครั้งถัดไปแทนการพิมพ์รหัสผ่าน",
+        currentEmail: "อีเมลที่ใช้อยู่",
+        passwordTitle: "เปลี่ยนรหัสผ่าน",
+        passwordHint: "ตั้งรหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร แล้วใช้รหัสใหม่นี้สำหรับการเข้าสู่ระบบครั้งถัดไป",
+        newPassword: "รหัสผ่านใหม่",
+        confirmPassword: "ยืนยันรหัสผ่านใหม่",
+        passwordPlaceholder: "อย่างน้อย 6 ตัวอักษร",
+        updatePassword: "บันทึกรหัสผ่านใหม่",
+        savingPassword: "กำลังบันทึก...",
+        passwordUpdated: "อัปเดตรหัสผ่านเรียบร้อย",
+        passwordMismatch: "รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน",
+        passwordTooShort: "รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร",
+        registerPasskey: "เพิ่ม Passkey บนอุปกรณ์นี้",
+        loadingPasskeys: "กำลังโหลด passkeys...",
+        emptyPasskeys: "ยังไม่มี passkey ที่ผูกกับบัญชีนี้",
+        lastUsed: "ใช้งานล่าสุด",
+        addedOn: "เพิ่มเมื่อ",
+        removePasskey: "ลบ Passkey",
+        passkeyAdded: "เพิ่ม passkey สำเร็จ",
+        passkeyRemoved: "ลบ passkey แล้ว",
+        securityError: "จัดการข้อมูลความปลอดภัยไม่สำเร็จ",
+        signOut: "ออกจากระบบ"
       }
     : {
         summary: "Settlement page",
@@ -50,11 +82,43 @@ function settingsCopy(locale: "th" | "en") {
         cancelEdit: "Cancel edit",
         emptyPreset: "No presets yet",
         deletePreset: "Delete",
-        saveFailed: "Enter a preset name before saving"
+        saveFailed: "Enter a preset name before saving",
+        securityTitle: "Account security",
+        securityHint: "Add a passkey so future sign-ins can use your fingerprint, Face ID, or device biometrics instead of typing your password.",
+        currentEmail: "Signed-in email",
+        passwordTitle: "Change password",
+        passwordHint: "Set a new password with at least 6 characters. You will use the new password the next time you sign in.",
+        newPassword: "New password",
+        confirmPassword: "Confirm new password",
+        passwordPlaceholder: "At least 6 characters",
+        updatePassword: "Save new password",
+        savingPassword: "Saving...",
+        passwordUpdated: "Password updated successfully",
+        passwordMismatch: "New password and confirmation do not match",
+        passwordTooShort: "Password must be at least 6 characters",
+        registerPasskey: "Add a passkey on this device",
+        loadingPasskeys: "Loading passkeys...",
+        emptyPasskeys: "No passkeys are linked to this account yet.",
+        lastUsed: "Last used",
+        addedOn: "Added",
+        removePasskey: "Remove passkey",
+        passkeyAdded: "Passkey added successfully",
+        passkeyRemoved: "Passkey removed",
+        securityError: "Unable to manage account security",
+        signOut: "Sign out"
       };
 }
 
+function formatDateTime(locale: "th" | "en", value?: string) {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
 export default function SettingsPage() {
+  const router = useRouter();
   const { locale } = useLocale();
   const copy = settingsCopy(locale);
   const { transactionTypePresets, addTransactionTypePreset, updateTransactionTypePreset, deleteTransactionTypePreset } = useFlowPayStore();
@@ -62,6 +126,16 @@ export default function SettingsPage() {
   const [baseType, setBaseType] = useState<TransactionTypePresetBaseType>("normal");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [securityError, setSecurityError] = useState("");
+  const [securityMessage, setSecurityMessage] = useState("");
+  const [passkeys, setPasskeys] = useState<PasskeyItem[]>([]);
+  const [loadingPasskeys, setLoadingPasskeys] = useState(true);
+  const [busyPasskeyId, setBusyPasskeyId] = useState<string | null>(null);
+  const [creatingPasskey, setCreatingPasskey] = useState(false);
+  const [currentEmail, setCurrentEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   function resetPresetForm() {
     setLabel("");
@@ -96,9 +170,224 @@ export default function SettingsPage() {
     resetPresetForm();
   }
 
+  async function loadPasskeys() {
+    setLoadingPasskeys(true);
+    setSecurityError("");
+
+    try {
+      const supabase = createClient();
+      const [{ data: userResult, error: userError }, { data: passkeyResult, error: passkeyError }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.auth.passkey.list()
+      ]);
+
+      if (userError) throw userError;
+      if (passkeyError) throw passkeyError;
+
+      setCurrentEmail(userResult.user?.email ?? "");
+      setPasskeys(passkeyResult ?? []);
+    } catch (loadError: unknown) {
+      setSecurityError(loadError instanceof Error ? loadError.message : copy.securityError);
+    } finally {
+      setLoadingPasskeys(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadPasskeys();
+  }, []);
+
+  async function handleRegisterPasskey() {
+    setCreatingPasskey(true);
+    setSecurityError("");
+    setSecurityMessage("");
+
+    try {
+      const supabase = createClient();
+      const { error: registerError } = await supabase.auth.registerPasskey();
+
+      if (registerError) {
+        throw registerError;
+      }
+
+      setSecurityMessage(copy.passkeyAdded);
+      await loadPasskeys();
+    } catch (registerError: unknown) {
+      setSecurityError(registerError instanceof Error ? registerError.message : copy.securityError);
+    } finally {
+      setCreatingPasskey(false);
+    }
+  }
+
+  async function handlePasswordUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSecurityError("");
+    setSecurityMessage("");
+
+    if (newPassword.length < 6) {
+      setSecurityError(copy.passwordTooShort);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setSecurityError(copy.passwordMismatch);
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setNewPassword("");
+      setConfirmPassword("");
+      setSecurityMessage(copy.passwordUpdated);
+    } catch (updateError: unknown) {
+      setSecurityError(updateError instanceof Error ? updateError.message : copy.securityError);
+    } finally {
+      setPasswordLoading(false);
+    }
+  }
+
+  async function handleDeletePasskey(passkeyId: string) {
+    setBusyPasskeyId(passkeyId);
+    setSecurityError("");
+    setSecurityMessage("");
+
+    try {
+      const supabase = createClient();
+      const { error: deleteError } = await supabase.auth.passkey.delete({ passkeyId });
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      setSecurityMessage(copy.passkeyRemoved);
+      await loadPasskeys();
+    } catch (deleteError: unknown) {
+      setSecurityError(deleteError instanceof Error ? deleteError.message : copy.securityError);
+    } finally {
+      setBusyPasskeyId(null);
+    }
+  }
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.replace("/auth/login");
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-black">{t(locale, "settings")}</h1>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-teal-500 text-slate-950">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">{copy.securityTitle}</h2>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.securityHint}</p>
+            <p className="mt-3 text-sm font-medium">
+              {copy.currentEmail}: <span className="text-slate-500 dark:text-slate-400">{currentEmail || "-"}</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button type="button" onClick={() => void handleRegisterPasskey()} disabled={creatingPasskey || loadingPasskeys || passwordLoading}>
+            <Fingerprint className="h-4 w-4" />
+            {copy.registerPasskey}
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => void handleSignOut()} disabled={passwordLoading}>
+            <LogOut className="h-4 w-4" />
+            {copy.signOut}
+          </Button>
+        </div>
+
+        <form className="mt-5 rounded-2xl border border-slate-200 p-4 dark:border-white/10" onSubmit={handlePasswordUpdate}>
+          <div className="flex items-start gap-3">
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+              <KeyRound className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">{copy.passwordTitle}</h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.passwordHint}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <Field label={copy.newPassword}>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder={copy.passwordPlaceholder}
+              />
+            </Field>
+            <Field label={copy.confirmPassword}>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder={copy.passwordPlaceholder}
+              />
+            </Field>
+          </div>
+
+          <Button type="submit" className="mt-4" disabled={passwordLoading || !newPassword || !confirmPassword}>
+            <KeyRound className="h-4 w-4" />
+            {passwordLoading ? copy.savingPassword : copy.updatePassword}
+          </Button>
+        </form>
+
+        <div className="mt-5 space-y-3">
+          {loadingPasskeys ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400">{copy.loadingPasskeys}</p>
+          ) : passkeys.length ? (
+            passkeys.map((passkey) => (
+              <div key={passkey.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3 dark:border-white/10">
+                <div>
+                  <p className="font-semibold">{passkey.friendly_name || "Passkey"}</p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    {copy.addedOn}: {formatDateTime(locale, passkey.created_at)}
+                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {copy.lastUsed}: {formatDateTime(locale, passkey.last_used_at)}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-500"
+                  onClick={() => void handleDeletePasskey(passkey.id)}
+                  disabled={busyPasskeyId === passkey.id}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {copy.removePasskey}
+                </Button>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-400">{copy.emptyPasskeys}</p>
+          )}
+        </div>
+
+        {securityError ? <p className="mt-4 text-sm text-red-500">{securityError}</p> : null}
+        {!securityError && securityMessage ? <p className="mt-4 text-sm text-teal-600 dark:text-teal-300">{securityMessage}</p> : null}
+      </Card>
 
       <Card>
         <h2 className="text-xl font-bold">{copy.typePresets}</h2>

@@ -71,7 +71,7 @@ export default function MonthlySummaryPage() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          router.replace(`/unlock?reauth=1&next=${encodeURIComponent("/monthly-summary")}`);
+          router.replace(`/auth/login?reauth=1&next=${encodeURIComponent("/monthly-summary")}`);
         }
         return;
       }

@@ -2,6 +2,7 @@ import { categories, currentCycle, installments, transactionTypePresets, transac
 import { FlowPayRepository } from "@/repositories/flowpay-repository";
 import { getAppMode } from "@/services/flowpay/app-mode";
 import { defaultCarryOverAmount, defaultFoodBudgetTarget, householdPayrollDay } from "@/services/flowpay/config";
+import { getProductionHouseholdMembersOrThrow } from "@/services/flowpay/household-members";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/services/supabase/admin";
 import type { FlowPayBootstrap } from "@/types/flowpay-store";
 import { getBillingCycleFromPayrollDate } from "@/utils/billing-cycle";
@@ -10,6 +11,7 @@ import { getCurrentDateInTimeZone } from "@/utils/date";
 let householdSetupPromise: Promise<void> | null = null;
 
 async function ensureHouseholdSetup(repository: FlowPayRepository) {
+  const configuredMembers = getProductionHouseholdMembersOrThrow();
   let profiles = await repository.getHouseholdProfiles();
   let activeCycle = await repository.getCurrentBillingCycle();
   const categoryRows = await repository.getCategories();
@@ -39,47 +41,23 @@ async function ensureHouseholdSetup(repository: FlowPayRepository) {
     const existingUsersByEmail = new Map(
       (authUsersResult.users ?? [])
         .filter((user) => Boolean(user.email))
-        .map((user) => [user.email as string, user])
+        .map((user) => [(user.email as string).toLowerCase(), user])
     );
 
-    for (const [index, seedUser] of users.entries()) {
-      let authUser = existingUsersByEmail.get(seedUser.email ?? "");
+    for (const member of configuredMembers) {
+      const authUser = existingUsersByEmail.get(member.email);
 
       if (!authUser) {
-        const createdUserResult = await supabase.auth.admin.createUser({
-          email: seedUser.email ?? `household${index + 1}@flowpay.local`,
-          password: `${crypto.randomUUID()}Aa1!`,
-          email_confirm: true,
-          user_metadata: {
-            display_name: seedUser.displayName
-          }
-        });
-
-        if (createdUserResult.error || !createdUserResult.data.user) {
-          const { data: refreshedUsersResult, error: refreshedUsersError } = await supabase.auth.admin.listUsers({
-            page: 1,
-            perPage: 200
-          });
-
-          if (refreshedUsersError) {
-            throw refreshedUsersError;
-          }
-
-          authUser = (refreshedUsersResult.users ?? []).find((user) => user.email === (seedUser.email ?? ""));
-
-          if (!authUser) {
-            throw createdUserResult.error ?? new Error("Failed to create household user");
-          }
-        } else {
-          authUser = createdUserResult.data.user;
-        }
+        throw new Error(
+          `Missing Supabase Auth user for ${member.email}. Create this user manually in Supabase Auth before starting FlowPay production mode.`
+        );
       }
 
       const { error: profileError } = await supabase.from("profiles").upsert(
         {
           id: authUser.id,
-          display_name: seedUser.displayName,
-          email: authUser.email ?? seedUser.email ?? null,
+          display_name: member.displayName,
+          email: authUser.email ?? member.email,
           avatar_url: null
         },
         {
@@ -179,7 +157,7 @@ export async function getFlowPayBootstrap(): Promise<FlowPayBootstrap> {
     }
 
     if (!cycle || profiles.length < 2) {
-      throw new Error("FlowPay household setup is incomplete");
+      throw new Error("FlowPay household setup is incomplete. Verify both pre-created household users exist in Supabase Auth.");
     }
 
     const [installmentRows, cycleTransactions] = await Promise.all([

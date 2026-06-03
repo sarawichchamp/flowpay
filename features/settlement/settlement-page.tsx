@@ -71,7 +71,7 @@ export function SettlementPage() {
 
     if (!response.ok) {
       if (response.status === 401) {
-        router.replace(`/unlock?reauth=1&next=${encodeURIComponent("/settlement")}`);
+        router.replace(`/auth/login?reauth=1&next=${encodeURIComponent("/settlement")}`);
         return;
       }
       setError(payload.error ?? copy.loadFailed);

@@ -1,3 +1,5 @@
+/* global URL */
+
 const CACHE_NAME = "flowpay-v2";
 const OFFLINE_URLS = ["/", "/manifest.webmanifest"];
 const STATIC_DESTINATIONS = new Set(["style", "script", "font", "image"]);

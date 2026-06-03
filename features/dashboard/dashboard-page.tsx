@@ -27,7 +27,7 @@ function toLocalDateKey(value: Date) {
 
 export function DashboardPage() {
   const { locale } = useLocale();
-  const { currentCycle, installments, mode, transactions, users } = useFlowPayStore();
+  const { currentCycle, mode, transactions, users } = useFlowPayStore();
   const [chartsReady, setChartsReady] = useState(false);
   const [foodDetailsOpen, setFoodDetailsOpen] = useState(false);
   const [historicalSummaries, setHistoricalSummaries] = useState<SummaryRow[]>([]);
