@@ -138,27 +138,27 @@ export function SettlementPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-black">{copy.title}</h1>
-        <p className="mt-2 text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
+        <h1 className="text-2xl font-black sm:text-3xl">{copy.title}</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
       </div>
 
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
       {message ? <p className="text-sm text-teal-600 dark:text-teal-300">{message}</p> : null}
 
-      <Card>
-        <div className="grid gap-3 border-b border-slate-200 pb-3 text-sm font-semibold dark:border-white/10 md:grid-cols-[minmax(0,1fr)_180px_150px]">
+      <Card className="p-4">
+        <div className="grid gap-3 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400 md:grid-cols-[minmax(0,1fr)_170px_140px]">
           <p>{copy.cycleColumn}</p>
           <p className="md:text-right">{copy.budgetColumn}</p>
           <p className="md:text-right">{copy.open}</p>
         </div>
         <div className="divide-y divide-slate-200 dark:divide-white/10">
           {summaries.length ? summaries.map((summary) => (
-            <div key={summary.cycle.id} className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_180px_150px] md:items-center">
+            <div key={summary.cycle.id} className="grid gap-3 py-3 md:grid-cols-[minmax(0,1fr)_170px_140px] md:items-center">
               <div className="min-w-0">
                 <p className="font-semibold">{formatCycleLabel(locale, summary.cycle.startDate)}</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   {summary.cycle.startDate} - {summary.cycle.endDate}
                 </p>
               </div>
@@ -169,7 +169,7 @@ export function SettlementPage() {
                   step="0.01"
                   value={budgetDrafts[summary.cycle.id] ?? ""}
                   onChange={(event) => setBudgetDrafts((current) => ({ ...current, [summary.cycle.id]: event.target.value }))}
-                  className="text-right"
+                  className="h-10 rounded-xl px-3 text-right text-sm"
                 />
                 <Button type="button" size="icon" onClick={() => void saveBudget(summary.cycle.id)} disabled={savingCycleId === summary.cycle.id}>
                   <Check className="h-4 w-4" />
@@ -179,7 +179,7 @@ export function SettlementPage() {
                 <Link
                   href={`/settlement/${encodeURIComponent(summary.cycle.startDate)}`}
                   className={cn(
-                    "inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-5 font-semibold transition active:scale-[0.98]",
+                    "inline-flex h-10 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-semibold transition active:scale-[0.98]",
                     "bg-white/70 text-slate-950 ring-1 ring-slate-200 hover:bg-white dark:bg-white/10 dark:text-white dark:ring-white/10"
                   )}
                 >

@@ -215,39 +215,39 @@ export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
   const finalTransfer = settlement.finalTransfer;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-start justify-between gap-4">
         <div>
           <Link
             href="/settlement"
             className={cn(
-              "-ml-3 inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-5 font-semibold transition active:scale-[0.98]",
+              "-ml-3 inline-flex h-10 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-semibold transition active:scale-[0.98]",
               "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
             )}
           >
             <ArrowLeft className="h-4 w-4" />
             {copy.back}
           </Link>
-          <h1 className="mt-2 text-3xl font-black">{formatCycleLabel(locale, selectedSummary.cycle.startDate)}</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <h1 className="mt-1 text-2xl font-black sm:text-3xl">{formatCycleLabel(locale, selectedSummary.cycle.startDate)}</h1>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
             {selectedSummary.cycle.startDate} - {selectedSummary.cycle.endDate}
           </p>
         </div>
         <Badge>{formatTHB(selectedSummary.cycle.foodBudgetTarget)}</Badge>
       </div>
 
-      <Card className="space-y-4 bg-slate-950 p-4 text-white dark:bg-white/[0.08]">
+      <Card className="space-y-3 bg-slate-950 p-4 text-white dark:bg-white/[0.08]">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-300/15 text-teal-200">
             <Scale className="h-5 w-5" />
           </div>
           <div>
             <Badge className="bg-white/10 text-white">{t(locale, "monthlySettlement")}</Badge>
-            <h2 className="mt-1 text-2xl font-black">{t(locale, "netTransfer")}</h2>
+            <h2 className="mt-1 text-xl font-black sm:text-2xl">{t(locale, "netTransfer")}</h2>
           </div>
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+        <div className="grid gap-2.5 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
           <div className="rounded-2xl bg-white/10 p-3">
             <p className="text-xs text-slate-300">
               {userA?.displayName} {t(locale, "givesTo")} {userB?.displayName}
@@ -279,15 +279,15 @@ export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
       </Card>
 
       <section className="grid gap-3 md:grid-cols-3">
-        <Card className="p-4">
+        <Card className="p-3.5">
           <p className="text-sm text-slate-500 dark:text-slate-400">{t(locale, "budgetAvailable")}</p>
           <p className="mt-1 text-xl font-black">{formatTHB(settlement.food.budgetAvailable)}</p>
         </Card>
-        <Card className="p-4">
+        <Card className="p-3.5">
           <p className="text-sm text-slate-500 dark:text-slate-400">{t(locale, "foodRemaining")}</p>
           <p className="mt-1 text-xl font-black">{formatTHB(settlement.food.remaining)}</p>
         </Card>
-        <Card className="p-4">
+        <Card className="p-3.5">
           <p className="text-sm text-slate-500 dark:text-slate-400">{t(locale, "nextContributionPerUser")}</p>
           <p className="mt-1 text-xl font-black">{formatTHB(settlement.nextCycleContribution.perUserContribution)}</p>
         </Card>

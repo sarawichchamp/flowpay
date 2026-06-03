@@ -26,11 +26,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f6f8fb] text-slate-950 dark:bg-[#07111f] dark:text-white">
       {!isPlainRoute ? (
-        <div className="fixed inset-x-0 top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl dark:border-white/10 dark:bg-[#07111f]/80">
-          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+        <div
+          className="fixed inset-x-0 top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl dark:border-white/10 dark:bg-[#07111f]/80"
+          style={{
+            paddingTop: "env(safe-area-inset-top)",
+            paddingLeft: "env(safe-area-inset-left)",
+            paddingRight: "env(safe-area-inset-right)"
+          }}
+        >
+          <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-2 px-3 py-2 sm:px-4">
             <Link href="/" className="flex items-center gap-3 font-bold">
               <span className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-950 text-teal-300 dark:bg-white">FP</span>
-              <span>FlowPay</span>
+              <span className="hidden min-[390px]:inline">FlowPay</span>
             </Link>
             <div className="hidden items-center gap-1 md:flex">
               {navItems.map((item) => {
@@ -51,7 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 );
               })}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <Button
                 aria-label={t(locale, "toggleLanguage")}
                 size="sm"
@@ -85,7 +92,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <main className={cn(isPlainRoute ? "min-h-screen" : "mx-auto max-w-6xl px-4 pb-28 pt-24 md:pb-10")}>{children}</main>
+      <main
+        className={cn(isPlainRoute ? "min-h-screen" : "mx-auto max-w-6xl px-4 pb-28 md:pb-10")}
+        style={isPlainRoute ? undefined : { paddingTop: "calc(env(safe-area-inset-top) + 6rem)" }}
+      >
+        {children}
+      </main>
 
       {!isPlainRoute ? (
         <Link
@@ -98,7 +110,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       {!isPlainRoute ? (
-        <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl dark:border-white/10 dark:bg-[#07111f]/95 md:hidden">
+        <nav
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-2 pt-2 backdrop-blur-xl dark:border-white/10 dark:bg-[#07111f]/95 md:hidden"
+          style={{
+            paddingBottom: "env(safe-area-inset-bottom)",
+            paddingLeft: "env(safe-area-inset-left)",
+            paddingRight: "env(safe-area-inset-right)"
+          }}
+        >
           <div className="grid grid-cols-6 gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;

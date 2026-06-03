@@ -166,10 +166,8 @@ export async function getFlowPayBootstrap(): Promise<FlowPayBootstrap> {
       throw new Error("FlowPay household setup is incomplete. Verify both pre-created household users exist in Supabase Auth.");
     }
 
-    const [installmentRows, cycleTransactions] = await Promise.all([
-      repository.getActiveInstallments(),
-      repository.getTransactionsForCycle(cycle.id)
-    ]);
+    const installmentRows = await repository.getActiveInstallments();
+    const cycleTransactions = await repository.getTransactionsForCycle(cycle.id);
 
     return {
       mode: "production",

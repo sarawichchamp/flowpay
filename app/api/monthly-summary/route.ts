@@ -4,6 +4,7 @@ import { requireHouseholdApiAccess } from "@/services/flowpay/api-access";
 import { createAdminClient } from "@/services/supabase/admin";
 import { calculateMonthlySettlement } from "@/services/settlement/calculate-monthly-settlement";
 import type { SummaryRow } from "@/features/settlement/types";
+import { parseInstallmentProgress } from "@/utils/installments";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +20,14 @@ export async function GET(request: Request) {
   const cycleStart = url.searchParams.get("cycleStart");
 
   try {
-    const [profiles, cycles, transactions, installments, categories] = await Promise.all([
+    const [profiles, cycles, installments, categories] = await Promise.all([
       repository.getHouseholdProfiles(),
       repository.getAllBillingCycles(),
-      repository.getAllTransactions(),
       repository.getActiveInstallments(),
       repository.getCategories()
     ]);
+
+    const transactions = await repository.getAllTransactions();
 
     if (profiles.length < 2) {
       return NextResponse.json({ summaries: [] });
@@ -63,6 +65,7 @@ export async function GET(request: Request) {
         detailedLedger: settlement.ledger.map((line) => {
           const transaction = line.transactionId ? transactionMap.get(line.transactionId) : undefined;
           const category = transaction ? categoryMap.get(transaction.categoryId) : undefined;
+          const installmentProgress = transaction ? parseInstallmentProgress(transaction.title) : null;
 
           return {
             ...line,
@@ -70,9 +73,34 @@ export async function GET(request: Request) {
             categoryId: transaction?.categoryId ?? null,
             categoryName: category?.name ?? null,
             date: transaction?.date ?? null,
-            transactionType: transaction?.transactionType ?? null
+            transactionType: transaction?.transactionType ?? null,
+            payerUserId: transaction?.payerUserId ?? null,
+            installmentNumber: installmentProgress?.installmentNumber ?? null,
+            totalInstallments: installmentProgress?.totalInstallments ?? null
           };
-        })
+        }),
+        installmentTransactions: cycleTransactions
+          .filter((transaction) => transaction.transactionType === "installment")
+          .map((transaction) => {
+            const category = categoryMap.get(transaction.categoryId);
+            const installmentProgress = parseInstallmentProgress(transaction.title);
+
+            return {
+              fromUserId: transaction.payerUserId,
+              toUserId: transaction.payerUserId,
+              amount: transaction.amount,
+              reason: "Shared installment",
+              transactionId: transaction.id,
+              title: transaction.title,
+              categoryId: transaction.categoryId,
+              categoryName: category?.name ?? null,
+              date: transaction.date,
+              transactionType: transaction.transactionType,
+              payerUserId: transaction.payerUserId,
+              installmentNumber: installmentProgress?.installmentNumber ?? null,
+              totalInstallments: installmentProgress?.totalInstallments ?? null
+            };
+          })
       };
     });
 

@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 import { FlowPayRepository } from "@/repositories/flowpay-repository";
 import { requireHouseholdApiAccess } from "@/services/flowpay/api-access";
 import { defaultFoodBudgetTarget, householdPayrollDay } from "@/services/flowpay/config";
+import { ensureInstallmentTransactionsForCycle } from "@/services/installments/ensure-cycle-installment-transactions";
 import { calculateMonthlySettlement } from "@/services/settlement/calculate-monthly-settlement";
 import { createAdminClient } from "@/services/supabase/admin";
 import { getBillingCycleFromPayrollDate } from "@/utils/billing-cycle";
+import type { BillingCycle } from "@/types/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -46,9 +48,10 @@ export async function POST(request: Request) {
       foodWalletHolderUserId?: string;
     };
 
-    const [currentCycle, profiles] = await Promise.all([
+    const [currentCycle, profiles, installments] = await Promise.all([
       repository.getCurrentBillingCycle(),
-      repository.getHouseholdProfiles()
+      repository.getHouseholdProfiles(),
+      repository.getActiveInstallments()
     ]);
 
     if (!currentCycle || profiles.length < 2) {
@@ -76,6 +79,7 @@ export async function POST(request: Request) {
     const existingCycle = await repository.getBillingCycleByDates(derivedCycle.startDate, derivedCycle.endDate);
 
     if (existingCycle) {
+      await ensureInstallmentTransactionsForCycle(supabase, existingCycle, installments);
       return NextResponse.json({
         billingCycle: existingCycle,
         carryOverAmount: settlement.food.carryOverToNextCycle,
@@ -99,16 +103,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    const createdCycle: BillingCycle = {
+      id: data.id,
+      startDate: data.start_date,
+      endDate: data.end_date,
+      foodBudgetTarget: data.food_budget_target,
+      foodWalletHolderUserId: data.food_wallet_holder_user_id,
+      carryOverAmount: data.carry_over_amount,
+      createdAt: data.created_at
+    };
+
+    await ensureInstallmentTransactionsForCycle(supabase, createdCycle, installments);
+
     return NextResponse.json({
-      billingCycle: {
-        id: data.id,
-        startDate: data.start_date,
-        endDate: data.end_date,
-        foodBudgetTarget: data.food_budget_target,
-        foodWalletHolderUserId: data.food_wallet_holder_user_id,
-        carryOverAmount: data.carry_over_amount,
-        createdAt: data.created_at
-      },
+      billingCycle: createdCycle,
       carryOverAmount: settlement.food.carryOverToNextCycle,
       alreadyExists: false
     });

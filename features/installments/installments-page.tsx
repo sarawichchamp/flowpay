@@ -12,6 +12,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { t } from "@/i18n/dictionary";
 import type { SplitType } from "@/types/domain";
 import { formatTHB } from "@/utils/currency";
+import { parseInstallmentProgress } from "@/utils/installments";
 
 const splitTypeOptions: Array<{ value: SplitType; labelKey: "splitHalf" | "noSplit" | "fullReimburse" }> = [
   { value: "split_half", labelKey: "splitHalf" },
@@ -53,8 +54,10 @@ function installmentsCopy(locale: "th" | "en") {
 
 export function InstallmentsPage() {
   const { locale } = useLocale();
-  const { currentCycle, installments, addInstallment, updateInstallment, deleteInstallment, users } = useFlowPayStore();
+  const { currentCycle, installments, transactions, addInstallment, updateInstallment, deleteInstallment, users } = useFlowPayStore();
   const copy = installmentsCopy(locale);
+  const compactFieldClass = "h-10 rounded-xl px-3 text-sm";
+  const compactSelectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10";
   const [title, setTitle] = useState("");
   const [totalInstallments, setTotalInstallments] = useState("10");
   const [currentInstallment, setCurrentInstallment] = useState("1");
@@ -144,44 +147,44 @@ export function InstallmentsPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-      <Card>
+    <div className="grid gap-4 lg:grid-cols-[0.88fr_1.12fr]">
+      <Card className="p-4 sm:p-5">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
             <Repeat className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-bold">{editingInstallmentId ? copy.editTitle : copy.createTitle}</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
+            <h1 className="text-lg font-bold sm:text-xl">{editingInstallmentId ? copy.editTitle : copy.createTitle}</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
           </div>
         </div>
 
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+        <form className="mt-4 space-y-2.5" onSubmit={handleSubmit}>
           <Field label={t(locale, "installmentTitle")}>
-            <Input placeholder={t(locale, "installmentTitle")} value={title} onChange={(event) => setTitle(event.target.value)} />
+            <Input className={compactFieldClass} placeholder={t(locale, "installmentTitle")} value={title} onChange={(event) => setTitle(event.target.value)} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t(locale, "totalInstallments")}>
-              <Input type="number" min="1" value={totalInstallments} onChange={(event) => setTotalInstallments(event.target.value)} />
+              <Input className={compactFieldClass} type="number" min="1" value={totalInstallments} onChange={(event) => setTotalInstallments(event.target.value)} />
             </Field>
             <Field label={t(locale, "currentInstallment")}>
-              <Input type="number" min="1" value={currentInstallment} onChange={(event) => setCurrentInstallment(event.target.value)} />
+              <Input className={compactFieldClass} type="number" min="1" value={currentInstallment} onChange={(event) => setCurrentInstallment(event.target.value)} />
             </Field>
           </div>
           <Field label={t(locale, "monthlyAmount")}>
-            <Input type="number" min="0" step="0.01" value={monthlyAmount} onChange={(event) => setMonthlyAmount(event.target.value)} />
+            <Input className={compactFieldClass} type="number" min="0" step="0.01" value={monthlyAmount} onChange={(event) => setMonthlyAmount(event.target.value)} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label={t(locale, "startDate")}>
-              <Input type="date" aria-label={t(locale, "startDate")} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+              <Input className={compactFieldClass} type="date" aria-label={t(locale, "startDate")} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
             </Field>
             <Field label={t(locale, "endDate")}>
-              <Input type="date" aria-label={t(locale, "endDate")} value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+              <Input className={compactFieldClass} type="date" aria-label={t(locale, "endDate")} value={endDate} onChange={(event) => setEndDate(event.target.value)} />
             </Field>
           </div>
           <Field label={t(locale, "paid")}>
             <select
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
+              className={compactSelectClass}
               value={payerUserId}
               onChange={(event) => setPayerUserId(event.target.value)}
             >
@@ -194,7 +197,7 @@ export function InstallmentsPage() {
           </Field>
           <Field label={t(locale, "settlement")}>
             <select
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
+              className={compactSelectClass}
               value={splitType}
               onChange={(event) => setSplitType(event.target.value as SplitType)}
             >
@@ -224,33 +227,38 @@ export function InstallmentsPage() {
 
       <div className="space-y-4">
         <div>
-          <h2 className="text-3xl font-black">{t(locale, "installments")}</h2>
-          <p className="mt-1 text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
+          <h2 className="text-2xl font-black">{t(locale, "installments")}</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
         </div>
         <div className="grid gap-4">
           {installments.map((item) => {
-            const progress = Math.round((item.currentInstallment / item.totalInstallments) * 100);
+            const currentCycleTransaction = transactions.find(
+              (transaction) => transaction.installmentId === item.id && transaction.billingCycleId === currentCycle.id
+            );
+            const parsedProgress = currentCycleTransaction ? parseInstallmentProgress(currentCycleTransaction.title) : null;
+            const displayInstallmentNumber = parsedProgress?.installmentNumber ?? item.currentInstallment;
+            const progress = Math.round((displayInstallmentNumber / item.totalInstallments) * 100);
             return (
-              <Card key={item.id}>
-                <div className="flex items-start justify-between gap-4">
+              <Card key={item.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
                   <div>
                     <Badge>{t(locale, splitTypeOptions.find((option) => option.value === item.splitType)?.labelKey ?? "splitHalf")}</Badge>
-                    <h3 className="mt-3 text-2xl font-black">{item.title}</h3>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                      {item.currentInstallment}/{item.totalInstallments} {t(locale, "paidProgress")}
+                    <h3 className="mt-2 text-xl font-black">{item.title}</h3>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      {displayInstallmentNumber}/{item.totalInstallments} {t(locale, "paidProgress")}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-black">{formatTHB(item.monthlyAmount)}</p>
+                    <p className="text-lg font-black">{formatTHB(item.monthlyAmount)}</p>
                     {editingInstallmentId === item.id ? (
                       <p className="mt-2 text-xs font-semibold text-teal-600 dark:text-teal-300">{copy.editingBadge}</p>
                     ) : null}
                   </div>
                 </div>
-                <div className="mt-6 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
                   <div className="h-full rounded-full bg-teal-500" style={{ width: `${progress}%` }} />
                 </div>
-                <div className="mt-4 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <Button type="button" size="sm" variant="secondary" onClick={() => startEditing(item.id)}>
                     <Pencil className="h-4 w-4" />
                     {copy.edit}

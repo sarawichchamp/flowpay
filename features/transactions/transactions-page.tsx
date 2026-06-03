@@ -119,10 +119,17 @@ function resolvePreset(transactionTypePresets: TransactionTypePreset[], presetId
   );
 }
 
-function createDraftTransaction(userId: string, transactionTypePresets: TransactionTypePreset[]): DraftTransaction {
+let draftIdCounter = 1;
+
+function nextDraftLocalId() {
+  draftIdCounter += 1;
+  return `draft-${draftIdCounter}`;
+}
+
+function createDraftTransaction(userId: string, transactionTypePresets: TransactionTypePreset[], localId = "draft-1"): DraftTransaction {
   const presetId = getDefaultPresetId(transactionTypePresets, "food");
   return {
-    localId: crypto.randomUUID(),
+    localId,
     title: "",
     date: getCurrentDateStringInTimeZone(),
     amount: "",
@@ -193,9 +200,11 @@ export function TransactionsPage() {
   const { currentCycle, transactions, addTransactions, updateTransaction, deleteTransaction, resetDemoData, users, mode, transactionTypePresets } =
     useFlowPayStore();
   const copy = transactionsCopy(locale);
+  const compactFieldClass = "h-10 rounded-xl px-3 text-sm";
+  const compactSelectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10";
   const [drafts, setDrafts] = useState<DraftTransaction[]>([createDraftTransaction(users[0].id, transactionTypePresets)]);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<DraftTransaction>(createDraftTransaction(users[0].id, transactionTypePresets));
+  const [editDraft, setEditDraft] = useState<DraftTransaction>(createDraftTransaction(users[0].id, transactionTypePresets, "edit-draft"));
   const [submitError, setSubmitError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -210,7 +219,7 @@ export function TransactionsPage() {
 
   function resetEditForm() {
     setEditingTransactionId(null);
-    setEditDraft(createDraftTransaction(users[0].id, transactionTypePresets));
+    setEditDraft(createDraftTransaction(users[0].id, transactionTypePresets, "edit-draft"));
     setSubmitError("");
   }
 
@@ -292,7 +301,7 @@ export function TransactionsPage() {
   }
 
   function addRow() {
-    setDrafts((current) => [...current, createDraftTransaction(users[0].id, transactionTypePresets)]);
+    setDrafts((current) => [...current, createDraftTransaction(users[0].id, transactionTypePresets, nextDraftLocalId())]);
   }
 
   function removeRow(localId: string) {
@@ -415,28 +424,29 @@ export function TransactionsPage() {
           <form className="mt-4 space-y-2.5" onSubmit={handleEditSubmit}>
             <div className="grid gap-2.5 md:grid-cols-[1.2fr_0.8fr_0.9fr]">
               <Field label={t(locale, "title")}>
-                <Input value={editDraft.title} onChange={(event) => updateEditDraft({ title: event.target.value })} />
-              </Field>
-              <Field label={t(locale, "date")}>
-                <Input type="date" value={editDraft.date} onChange={(event) => updateEditDraft({ date: event.target.value })} />
-              </Field>
-              <Field label={t(locale, "amount")}>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                    <Input className={compactFieldClass} value={editDraft.title} onChange={(event) => updateEditDraft({ title: event.target.value })} />
+                  </Field>
+                  <Field label={t(locale, "date")}>
+                    <Input className={compactFieldClass} type="date" value={editDraft.date} onChange={(event) => updateEditDraft({ date: event.target.value })} />
+                  </Field>
+                  <Field label={t(locale, "amount")}>
+                    <Input
+                      className={compactFieldClass}
+                      type="number"
+                      min="0"
+                      step="0.01"
                   value={editDraft.amount}
                   onChange={(event) => updateEditDraft({ amount: event.target.value })}
                 />
               </Field>
             </div>
             <div className={editDraft.transactionType === "food" ? "grid gap-2.5 md:grid-cols-[1fr_1fr]" : "grid gap-2.5 md:grid-cols-[1fr_1fr_1fr]"}>
-              <Field label={copy.typeLabel}>
-                <select
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
-                  value={editDraft.transactionPresetId}
-                  onChange={(event) => updateEditDraft({ transactionPresetId: event.target.value })}
-                >
+                <Field label={copy.typeLabel}>
+                  <select
+                    className={compactSelectClass}
+                    value={editDraft.transactionPresetId}
+                    onChange={(event) => updateEditDraft({ transactionPresetId: event.target.value })}
+                  >
                   {transactionTypePresets.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.label}
@@ -447,7 +457,7 @@ export function TransactionsPage() {
               {editDraft.transactionType !== "food" ? (
                 <Field label={t(locale, "settlement")}>
                   <select
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
+                    className={compactSelectClass}
                     value={editDraft.splitType}
                     onChange={(event) => updateEditDraft({ splitType: event.target.value as SplitType })}
                   >
@@ -461,7 +471,7 @@ export function TransactionsPage() {
               ) : null}
               <Field label={t(locale, "paid")}>
                 <select
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
+                  className={compactSelectClass}
                   value={editDraft.payerUserId}
                   onChange={(event) => updateEditDraft({ payerUserId: event.target.value })}
                 >
@@ -495,7 +505,7 @@ export function TransactionsPage() {
         ) : (
           <form className="mt-4 space-y-2.5" onSubmit={handleBatchSubmit}>
             {drafts.map((draft, index) => (
-              <div key={draft.localId} className="rounded-xl border border-slate-200 p-2.5 dark:border-white/10">
+              <div key={draft.localId} className="rounded-xl border border-slate-200 p-2 dark:border-white/10">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                     {copy.rowLabel} {index + 1}
@@ -515,13 +525,14 @@ export function TransactionsPage() {
                 </div>
                 <div className="grid gap-2.5 md:grid-cols-[1.3fr_0.75fr_0.75fr]">
                   <Field label={t(locale, "title")}>
-                    <Input value={draft.title} onChange={(event) => updateDraft(draft.localId, { title: event.target.value })} />
+                    <Input className={compactFieldClass} value={draft.title} onChange={(event) => updateDraft(draft.localId, { title: event.target.value })} />
                   </Field>
                   <Field label={t(locale, "date")}>
-                    <Input type="date" value={draft.date} onChange={(event) => updateDraft(draft.localId, { date: event.target.value })} />
+                    <Input className={compactFieldClass} type="date" value={draft.date} onChange={(event) => updateDraft(draft.localId, { date: event.target.value })} />
                   </Field>
                   <Field label={t(locale, "amount")}>
                     <Input
+                      className={compactFieldClass}
                       type="number"
                       min="0"
                       step="0.01"
@@ -533,7 +544,7 @@ export function TransactionsPage() {
                 <div className={draft.transactionType === "food" ? "mt-2.5 grid gap-2.5 md:grid-cols-[1fr_1fr]" : "mt-2.5 grid gap-2.5 md:grid-cols-[1fr_1fr_1fr_1fr]"}>
                   <Field label={copy.typeLabel}>
                     <select
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
+                      className={compactSelectClass}
                       value={draft.transactionPresetId}
                       onChange={(event) => updateDraft(draft.localId, { transactionPresetId: event.target.value })}
                     >
@@ -547,7 +558,7 @@ export function TransactionsPage() {
                   {draft.transactionType !== "food" ? (
                     <Field label={t(locale, "settlement")}>
                       <select
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
+                        className={compactSelectClass}
                         value={draft.splitType}
                         onChange={(event) => updateDraft(draft.localId, { splitType: event.target.value as SplitType })}
                       >
@@ -561,7 +572,7 @@ export function TransactionsPage() {
                   ) : null}
                   <Field label={t(locale, "paid")}>
                     <select
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10"
+                      className={compactSelectClass}
                       value={draft.payerUserId}
                       onChange={(event) => updateDraft(draft.localId, { payerUserId: event.target.value })}
                     >

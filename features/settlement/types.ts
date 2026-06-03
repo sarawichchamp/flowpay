@@ -6,6 +6,9 @@ export type DetailedLedgerLine = SettlementResult["ledger"][number] & {
   categoryName?: string | null;
   date?: string | null;
   transactionType?: string | null;
+  payerUserId?: string | null;
+  installmentNumber?: number | null;
+  totalInstallments?: number | null;
 };
 
 export type SummaryRow = {
@@ -18,4 +21,5 @@ export type SummaryRow = {
   };
   settlement: SettlementResult;
   detailedLedger: DetailedLedgerLine[];
+  installmentTransactions: DetailedLedgerLine[];
 };

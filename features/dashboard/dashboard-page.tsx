@@ -14,9 +14,11 @@ import { useLocale } from "@/hooks/use-locale";
 import { t } from "@/i18n/dictionary";
 import { calculateMonthlySettlement } from "@/services/settlement/calculate-monthly-settlement";
 import { createClient } from "@/services/supabase/browser";
+import { generateInstallmentTransactions } from "@/services/installments/generate-installment-transactions";
 import { getCategoryLabel } from "@/utils/categories";
 import { formatTHB, roundMoney } from "@/utils/currency";
 import { formatShortDate, inclusiveDays } from "@/utils/date";
+import { formatInstallmentProgressLabel, parseInstallmentProgress } from "@/utils/installments";
 
 function toLocalDateKey(value: Date) {
   const year = value.getFullYear();
@@ -27,9 +29,9 @@ function toLocalDateKey(value: Date) {
 
 export function DashboardPage() {
   const { locale } = useLocale();
-  const { currentCycle, mode, transactions, users } = useFlowPayStore();
+  const { currentCycle, installments, mode, transactions, users } = useFlowPayStore();
   const [chartsReady, setChartsReady] = useState(false);
-  const [foodDetailsOpen, setFoodDetailsOpen] = useState(false);
+  const [detailsModalType, setDetailsModalType] = useState<"food" | "other" | "installment" | null>(null);
   const [historicalSummaries, setHistoricalSummaries] = useState<SummaryRow[]>([]);
 
   const monthlySummaryLink =
@@ -52,7 +54,7 @@ export function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!foodDetailsOpen) return;
+    if (!detailsModalType) return;
 
     const previousBodyOverflow = document.body.style.overflow;
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -64,7 +66,7 @@ export function DashboardPage() {
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousHtmlOverflow;
     };
-  }, [foodDetailsOpen]);
+  }, [detailsModalType]);
 
   useEffect(() => {
     if (mode !== "production") return;
@@ -109,13 +111,54 @@ export function DashboardPage() {
       transactions
         .filter((item) => item.transactionType === "food")
         .slice()
-        .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt)),
+        .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)),
     [transactions]
   );
 
-  const otherExpenseTotal = useMemo(
-    () => transactions.filter((item) => item.transactionType !== "food").reduce((sum, item) => sum + item.amount, 0),
+  const otherTransactions = useMemo(
+    () =>
+      transactions
+        .filter((item) => item.transactionType === "normal")
+        .slice()
+        .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)),
     [transactions]
+  );
+
+  const installmentTransactions = useMemo(() => {
+    const actualTransactions = transactions.filter((item) => item.transactionType === "installment");
+    const existingInstallmentIds = new Set(actualTransactions.map((item) => item.installmentId).filter((value): value is string => Boolean(value)));
+    const projectedTransactions = installments
+      .flatMap((installment) => generateInstallmentTransactions(installment, [currentCycle], "other"))
+      .filter((item) => item.billingCycleId === currentCycle.id && item.installmentId && !existingInstallmentIds.has(item.installmentId))
+      .map((item, index) => ({
+        id: `projected-${item.installmentId}-${item.installmentNumber}-${index}`,
+        billingCycleId: item.billingCycleId,
+        date: item.date,
+        title: item.title,
+        categoryId: item.categoryId,
+        amount: item.amount,
+        payerUserId: item.payerUserId,
+        transactionType: item.transactionType,
+        splitType: item.splitType,
+        note: item.note,
+        attachmentUrl: item.attachmentUrl,
+        createdAt: `${item.date}T00:00:00.000Z`,
+        installmentId: item.installmentId
+      }));
+
+    return [...actualTransactions, ...projectedTransactions].sort(
+      (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)
+    );
+  }, [currentCycle, installments, transactions]);
+
+  const otherExpenseTotal = useMemo(
+    () => otherTransactions.reduce((sum, item) => sum + item.amount, 0),
+    [otherTransactions]
+  );
+
+  const installmentTotal = useMemo(
+    () => installmentTransactions.reduce((sum, item) => sum + item.amount, 0),
+    [installmentTransactions]
   );
 
   const categoryData = useMemo(
@@ -288,6 +331,43 @@ export function DashboardPage() {
         };
 
   const MonthlySummaryIcon = monthlySummaryLink.icon;
+  const otherExpenseListTitle = locale === "th" ? "รายการค่าใช้จ่ายอื่นรอบนี้" : "Other transactions this cycle";
+  const otherExpenseHint = locale === "th" ? "กดการ์ดเพื่อดูรายการค่าใช้จ่ายอื่นทั้งหมดของรอบนี้" : "Tap the card to see all other transactions in this cycle.";
+  const otherExpenseTotalLabel = locale === "th" ? "ยอดรวมค่าใช้จ่ายอื่นรอบนี้" : "Total other spending this cycle";
+  const noOtherTransactions = locale === "th" ? "ยังไม่มีรายการค่าใช้จ่ายอื่นในรอบนี้" : "No other transactions in this cycle";
+  const installmentCardLabel = locale === "th" ? "รายการผ่อนเดือนนี้" : "Installments this cycle";
+  const installmentCardHint = locale === "th" ? "กดการ์ดเพื่อดูรายการผ่อนของรอบบิลนี้ทั้งหมด" : "Tap the card to see all installment items in this billing cycle.";
+  const installmentListTitle = locale === "th" ? "รายการผ่อนรอบนี้" : "Installments this cycle";
+  const installmentTotalLabel = locale === "th" ? "ยอดรวมผ่อนรอบนี้" : "Total installments this cycle";
+  const noInstallmentTransactions = locale === "th" ? "ยังไม่มีรายการผ่อนในรอบนี้" : "No installments in this cycle";
+  const detailTransactions =
+    detailsModalType === "food"
+      ? foodTransactions
+      : detailsModalType === "other"
+        ? otherTransactions
+        : installmentTransactions;
+  const detailTitle =
+    detailsModalType === "food"
+      ? copy.foodExpenseList
+      : detailsModalType === "other"
+        ? otherExpenseListTitle
+        : installmentListTitle;
+  const detailHint =
+    detailsModalType === "food"
+      ? copy.foodExpenseHint
+      : detailsModalType === "other"
+        ? otherExpenseHint
+        : installmentCardHint;
+  const detailTotalLabel =
+    detailsModalType === "food"
+      ? copy.foodTotal
+      : detailsModalType === "other"
+        ? otherExpenseTotalLabel
+        : installmentTotalLabel;
+  const detailTotalValue =
+    detailsModalType === "food" ? settlement.food.spent : detailsModalType === "other" ? otherExpenseTotal : installmentTotal;
+  const detailSummaryLabel = detailsModalType === "food" ? copy.averageDailyFoodLabel : null;
+  const detailSummaryValue = detailsModalType === "food" ? settlement.food.averageDailySpending : null;
 
   return (
     <div className="space-y-6">
@@ -329,21 +409,22 @@ export function DashboardPage() {
         </motion.div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
-          { label: copy.foodSpentLabel, value: formatTHB(settlement.food.spent), icon: TrendingDown, interactive: true, hint: copy.foodExpenseHint },
-          { label: copy.otherSpentLabel, value: formatTHB(otherExpenseTotal), icon: Wallet },
+          { label: copy.foodSpentLabel, value: formatTHB(settlement.food.spent), icon: TrendingDown, interactive: "food" as const, hint: copy.foodExpenseHint },
+          { label: copy.otherSpentLabel, value: formatTHB(otherExpenseTotal), icon: Wallet, interactive: "other" as const, hint: otherExpenseHint },
+          { label: installmentCardLabel, value: `${installmentTransactions.length} ${t(locale, "items")}`, icon: Wallet, interactive: "installment" as const, hint: installmentCardHint },
           { label: copy.todayFoodLabel, value: `${formatTHB(todayFoodSpent)} / ${formatTHB(dailyFoodQuota)}`, icon: CalendarDays, hint: copy.todayVsQuota },
           { label: copy.averageDailyFoodLabel, value: formatTHB(settlement.food.averageDailySpending), icon: CalendarDays }
         ].map((item) => {
           const Icon = item.icon;
           if (item.interactive) {
             return (
-              <button key={item.label} type="button" className="text-left" onClick={() => setFoodDetailsOpen((current) => !current)}>
+              <button key={item.label} type="button" className="text-left" onClick={() => setDetailsModalType((current) => (current === item.interactive ? null : item.interactive))}>
                 <Card className="h-full transition hover:-translate-y-0.5 hover:shadow-lg">
                   <div className="flex items-start justify-between gap-3">
                     <Icon className="h-5 w-5 text-teal-600 dark:text-teal-300" />
-                    <ChevronDown className={`h-5 w-5 text-slate-400 transition ${foodDetailsOpen ? "rotate-180" : ""}`} />
+                    <ChevronDown className={`h-5 w-5 text-slate-400 transition ${detailsModalType === item.interactive ? "rotate-180" : ""}`} />
                   </div>
                   <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{item.label}</p>
                   <p className="mt-1 text-2xl font-bold">{item.value}</p>
@@ -364,20 +445,20 @@ export function DashboardPage() {
         })}
       </section>
 
-      {foodDetailsOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onClick={() => setFoodDetailsOpen(false)}>
+      {detailsModalType ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onClick={() => setDetailsModalType(null)}>
           <Card className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden p-0" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">
               <div>
-                <h2 className="text-lg font-bold">{copy.foodExpenseList}</h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.foodExpenseHint}</p>
+                <h2 className="text-lg font-bold">{detailTitle}</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{detailHint}</p>
               </div>
               <div className="flex items-center gap-3">
-                <Badge>{foodTransactions.length} {t(locale, "items")}</Badge>
+                <Badge>{detailTransactions.length} {t(locale, "items")}</Badge>
                 <button
                   type="button"
                   aria-label="Close"
-                  onClick={() => setFoodDetailsOpen(false)}
+                  onClick={() => setDetailsModalType(null)}
                   className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
                 >
                   <X className="h-4 w-4" />
@@ -385,17 +466,23 @@ export function DashboardPage() {
               </div>
             </div>
 
-            {foodTransactions.length ? (
+            {detailTransactions.length ? (
               <div className="overflow-y-auto overscroll-contain">
-                <div className="grid gap-3 border-b border-slate-200 px-5 py-4 sm:grid-cols-2 dark:border-white/10">
+                <div
+                  className={`grid gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10 ${
+                    detailsModalType === "food" ? "sm:grid-cols-2" : "sm:grid-cols-1"
+                  }`}
+                >
                   <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{copy.foodTotal}</p>
-                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{formatTHB(settlement.food.spent)}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{detailTotalLabel}</p>
+                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{formatTHB(detailTotalValue)}</p>
                   </div>
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{copy.averageDailyFoodLabel}</p>
-                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{formatTHB(settlement.food.averageDailySpending)}</p>
-                  </div>
+                  {detailSummaryLabel && detailSummaryValue !== null ? (
+                    <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{detailSummaryLabel}</p>
+                      <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{formatTHB(detailSummaryValue)}</p>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="min-w-[720px]">
                   <div className="grid grid-cols-[92px_minmax(0,1fr)_110px_220px] gap-3 bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
@@ -404,9 +491,10 @@ export function DashboardPage() {
                     <span className="text-right">{copy.itemAmount}</span>
                     <span>{copy.itemPayer}</span>
                   </div>
-                  {foodTransactions.map((transaction) => {
+                  {detailTransactions.map((transaction) => {
                     const payer = users.find((user) => user.id === transaction.payerUserId);
-                    const paidAhead = transaction.payerUserId !== currentCycle.foodWalletHolderUserId;
+                    const paidAhead = detailsModalType === "food" && transaction.payerUserId !== currentCycle.foodWalletHolderUserId;
+                    const installmentProgress = detailsModalType === "installment" ? parseInstallmentProgress(transaction.title) : null;
 
                     return (
                       <div
@@ -414,7 +502,16 @@ export function DashboardPage() {
                         className="grid grid-cols-[92px_minmax(0,1fr)_110px_220px] gap-3 border-t border-slate-200 px-5 py-3 text-sm dark:border-white/10"
                       >
                         <span className="text-slate-500 dark:text-slate-400">{formatShortDate(transaction.date)}</span>
-                        <span className="truncate font-semibold">{transaction.title}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold">
+                            {installmentProgress ? installmentProgress.baseTitle : transaction.title}
+                          </span>
+                          {installmentProgress ? (
+                            <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                              {formatInstallmentProgressLabel(locale, transaction.title)}
+                            </span>
+                          ) : null}
+                        </span>
                         <span className="text-right font-bold">{formatTHB(transaction.amount)}</span>
                         <span className="flex min-w-0 items-center gap-2">
                           <span className="truncate">{payer?.displayName ?? "-"}</span>
@@ -430,15 +527,17 @@ export function DashboardPage() {
                 </div>
               </div>
             ) : (
-              <p className="px-5 py-4 text-sm text-slate-500 dark:text-slate-400">{copy.noFoodTransactions}</p>
+              <p className="px-5 py-4 text-sm text-slate-500 dark:text-slate-400">
+                {detailsModalType === "food" ? copy.noFoodTransactions : detailsModalType === "other" ? noOtherTransactions : noInstallmentTransactions}
+              </p>
             )}
           </Card>
         </div>
       ) : null}
 
       <section>
-        <Card className="min-h-80 min-w-0">
-          <div className="flex items-start justify-between gap-3">
+        <Card className="min-h-80 min-w-0 overflow-hidden">
+          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
             <div>
               <h2 className="text-lg font-bold">{copy.dailyQuotaChart}</h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.dailyQuotaHint}</p>
@@ -458,13 +557,14 @@ export function DashboardPage() {
               </span>
             </div>
           </div>
-          <div className="mt-4 h-72 min-w-0">
+          <div className="mt-4 h-72 min-w-0 pointer-events-none md:pointer-events-auto">
             {chartsReady ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyFoodData} barCategoryGap={10}>
                   <XAxis dataKey="day" axisLine={false} tickLine={false} />
                   <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
                   <Tooltip
+                    cursor={false}
                     formatter={(value, name, entry) => {
                       if (name === "quota") return [formatTHB(Number(value ?? 0)), copy.dailyQuotaSeries];
                       const delta = Number(entry?.payload?.delta ?? 0);
@@ -503,12 +603,12 @@ export function DashboardPage() {
 
         <Card className="min-w-0">
           <h2 className="text-lg font-bold">{copy.categoryMixTitle}</h2>
-          <div className="mt-4 grid h-56 min-w-0 grid-cols-[0.9fr_1fr] items-center gap-2">
-            <div className="h-full min-w-0">
+          <div className="mt-4 grid min-w-0 grid-cols-1 items-center gap-4 sm:h-56 sm:grid-cols-[0.9fr_1fr] sm:gap-2">
+            <div className="h-56 min-w-0 pointer-events-none sm:h-full md:pointer-events-auto">
               {chartsReady ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={categoryData} dataKey="value" innerRadius={44} outerRadius={76} paddingAngle={4}>
+                    <Pie data={categoryData} dataKey="value" innerRadius={44} outerRadius={76} paddingAngle={4} rootTabIndex={-1}>
                       {categoryData.map((entry) => (
                         <Cell key={entry.name} fill={entry.color} />
                       ))}
@@ -533,8 +633,8 @@ export function DashboardPage() {
       </section>
 
       <section>
-        <Card className="min-h-80 min-w-0">
-          <div className="flex items-start justify-between gap-3">
+        <Card className="min-h-80 min-w-0 overflow-hidden">
+          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
             <div>
               <h2 className="text-lg font-bold">{copy.monthlyExpenses}</h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.monthlyExpensesHint}</p>
@@ -550,13 +650,14 @@ export function DashboardPage() {
               </span>
             </div>
           </div>
-          <div className="mt-4 h-64 min-w-0">
+          <div className="mt-4 h-64 min-w-0 pointer-events-none md:pointer-events-auto">
             {chartsReady ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyExpenseData} barCategoryGap={24}>
                   <XAxis dataKey="month" axisLine={false} tickLine={false} />
                   <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
                   <Tooltip
+                    cursor={false}
                     formatter={(value, name) => [formatTHB(Number(value ?? 0)), name === "food" ? copy.monthlyFood : copy.monthlyOther]}
                     labelFormatter={(label) => `${copy.monthlyExpenses}: ${label}`}
                   />
@@ -576,7 +677,10 @@ export function DashboardPage() {
             <Badge>{transactions.length} {t(locale, "items")}</Badge>
           </div>
           <div className="mt-4 space-y-2">
-            {transactions.map((transaction) => (
+            {transactions
+              .slice()
+              .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+              .map((transaction) => (
               <div key={transaction.id} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 dark:bg-white/5">
                 <div className="flex min-w-0 items-center gap-2 text-sm">
                   <span className="shrink-0 text-slate-500 dark:text-slate-400">{formatShortDate(transaction.date)}</span>
