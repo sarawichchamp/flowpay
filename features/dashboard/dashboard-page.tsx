@@ -35,9 +35,8 @@ export function DashboardPage() {
   const [historicalSummaries, setHistoricalSummaries] = useState<SummaryRow[]>([]);
   const [dailyChartXZoom, setDailyChartXZoom] = useState(1);
   const [dailyChartYZoom, setDailyChartYZoom] = useState(1);
+  const dailyChartInteractionRef = useRef<HTMLDivElement | null>(null);
   const dailyChartScrollRef = useRef<HTMLDivElement | null>(null);
-  const dailyChartYAxisZoomRef = useRef<HTMLDivElement | null>(null);
-  const dailyChartXAxisZoomRef = useRef<HTMLDivElement | null>(null);
   const dailyChartDragRef = useRef<{ pointerId: number; startX: number; scrollLeft: number } | null>(null);
   const dailyChartTouchRef = useRef<{ axis: "x" | "y"; lastX: number; lastY: number; pinchDistance: number | null } | null>(null);
 
@@ -284,14 +283,14 @@ export function DashboardPage() {
     [dailyFoodData]
   );
   const dailyChartDomainMax = Math.max(Math.ceil((dailyChartPeak * 1.15) / dailyChartYZoom), 1);
-  const dailyChartWidth = Math.max(640, Math.round(dailyFoodData.length * 44 * dailyChartXZoom));
+  const dailyChartWidth = `${Math.max(dailyChartXZoom * 100, 100)}%`;
 
   function clampZoom(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, Number(value.toFixed(2))));
   }
 
   function adjustDailyChartXZoom(delta: number) {
-    setDailyChartXZoom((current) => clampZoom(current + delta, 1, 4));
+    setDailyChartXZoom((current) => clampZoom(current + delta, 0.2, 4));
   }
 
   function adjustDailyChartYZoom(delta: number) {
@@ -307,43 +306,68 @@ export function DashboardPage() {
     adjustDailyChartYZoom(delta > 0 ? -0.2 : 0.2);
   }
 
-  function handleDailyChartWheelEvent(axis: "x" | "y", event: React.WheelEvent<HTMLDivElement>) {
+  function resolveDailyChartAxisFromPoint(clientX: number, clientY: number, rect: DOMRect) {
+    const localX = clientX - rect.left;
+    const localY = clientY - rect.top;
+
+    if (localX <= 56) return "y" as const;
+    if (localY >= rect.height - 40) return "x" as const;
+    return null;
+  }
+
+  function handleDailyChartWheelEvent(event: React.WheelEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const axis = resolveDailyChartAxisFromPoint(event.clientX, event.clientY, rect);
+    if (!axis) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    handleDailyChartWheel(axis, event.deltaY);
+  }
+
+  function handleDailyChartNativeWheel(event: WheelEvent, element: HTMLDivElement) {
+    const rect = element.getBoundingClientRect();
+    const axis = resolveDailyChartAxisFromPoint(event.clientX, event.clientY, rect);
+    if (!axis) return;
+
     event.preventDefault();
     event.stopPropagation();
     handleDailyChartWheel(axis, event.deltaY);
   }
 
   useEffect(() => {
-    const yElement = dailyChartYAxisZoomRef.current;
-    const xElement = dailyChartXAxisZoomRef.current;
+    const interactionElement = dailyChartInteractionRef.current;
+    const scrollElement = dailyChartScrollRef.current;
+    if (!interactionElement && !scrollElement) return;
 
-    const bindNativeWheel = (element: HTMLDivElement | null, axis: "x" | "y") => {
-      if (!element) return () => undefined;
-
-      const listener = (event: WheelEvent) => {
-        event.preventDefault();
-        event.stopPropagation();
-        handleDailyChartWheel(axis, event.deltaY);
-      };
-
-      element.addEventListener("wheel", listener, { passive: false });
-      return () => {
-        element.removeEventListener("wheel", listener);
-      };
+    const interactionListener = (event: WheelEvent) => {
+      if (!interactionElement) return;
+      handleDailyChartNativeWheel(event, interactionElement);
+    };
+    const scrollListener = (event: WheelEvent) => {
+      if (!interactionElement) return;
+      handleDailyChartNativeWheel(event, interactionElement);
     };
 
-    const unbindY = bindNativeWheel(yElement, "y");
-    const unbindX = bindNativeWheel(xElement, "x");
-
+    interactionElement?.addEventListener("wheel", interactionListener, { passive: false });
+    scrollElement?.addEventListener("wheel", scrollListener, { passive: false });
     return () => {
-      unbindY();
-      unbindX();
+      interactionElement?.removeEventListener("wheel", interactionListener);
+      scrollElement?.removeEventListener("wheel", scrollListener);
     };
   }, []);
 
-  function handleDailyChartTouchStart(axis: "x" | "y", event: React.TouchEvent<HTMLDivElement>) {
+  function handleDailyChartTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const first = event.touches[0];
+    if (!first) return;
+    const axis = resolveDailyChartAxisFromPoint(first.clientX, first.clientY, rect);
+    if (!axis) {
+      dailyChartTouchRef.current = null;
+      return;
+    }
+
     if (event.touches.length >= 2) {
-      const first = event.touches[0];
       const second = event.touches[1];
       const pinchDistance = axis === "x" ? Math.abs(second.clientX - first.clientX) : Math.abs(second.clientY - first.clientY);
       dailyChartTouchRef.current = { axis, lastX: first.clientX, lastY: first.clientY, pinchDistance };
@@ -355,9 +379,10 @@ export function DashboardPage() {
     dailyChartTouchRef.current = { axis, lastX: touch.clientX, lastY: touch.clientY, pinchDistance: null };
   }
 
-  function handleDailyChartTouchMove(axis: "x" | "y", event: React.TouchEvent<HTMLDivElement>) {
+  function handleDailyChartTouchMove(event: React.TouchEvent<HTMLDivElement>) {
     const state = dailyChartTouchRef.current;
-    if (!state || state.axis !== axis) return;
+    if (!state) return;
+    const axis = state.axis;
 
     if (event.touches.length >= 2) {
       event.preventDefault();
@@ -442,7 +467,7 @@ export function DashboardPage() {
           dailyQuotaHint: "เทียบโควต้าต่อวันกับค่าอาหารที่ใช้จริง เพื่อดูว่าวันไหนกินต่ำหรือเกินงบ",
           dailySpentSeries: "ใช้จริง",
           dailyQuotaSeries: "เส้นโควต้า",
-          dailyAverageSeries: "เส้นเฉลี่ยทั้งรอบ",
+          dailyAverageSeries: "เส้นเฉลี่ยค่ากิน",
           overBudget: "เกินโควต้า",
           underBudget: "ต่ำกว่าโควต้า",
           overBudgetHighlight: "สีส้มแดง = วันเกินโควต้า",
@@ -473,7 +498,7 @@ export function DashboardPage() {
           dailyQuotaHint: "Compare each day's food quota with actual spending to spot days that run under or over budget.",
           dailySpentSeries: "Spent",
           dailyQuotaSeries: "Quota line",
-          dailyAverageSeries: "Cycle average line",
+          dailyAverageSeries: "Food average line",
           overBudget: "Over quota",
           underBudget: "Under quota",
           overBudgetHighlight: "Orange-red bars mark days that go over quota",
@@ -717,25 +742,18 @@ export function DashboardPage() {
               </span>
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <span>{locale === "th" ? "ซูมแกนซ้าย: ล้อเมาส์หรือปัดขึ้นลง" : "Left axis: wheel or swipe up/down to zoom vertically"}</span>
-            <span>{locale === "th" ? "ซูมแกนล่าง: ล้อเมาส์หรือปัดซ้ายขวา" : "Bottom axis: wheel or swipe left/right to zoom horizontally"}</span>
-          </div>
-          <div className="mt-4 grid h-72 min-w-0 grid-cols-[44px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_40px] gap-2">
-            <div
-              ref={dailyChartYAxisZoomRef}
-              className="row-span-1 flex cursor-ns-resize items-center justify-center rounded-2xl bg-slate-50 text-[11px] font-semibold text-slate-500 select-none dark:bg-white/5 dark:text-slate-400"
-              onWheel={(event) => handleDailyChartWheelEvent("y", event)}
-              onTouchStart={(event) => handleDailyChartTouchStart("y", event)}
-              onTouchMove={(event) => handleDailyChartTouchMove("y", event)}
-              onTouchEnd={handleDailyChartTouchEnd}
-              style={{ touchAction: "none" }}
-            >
-              {locale === "th" ? "ซูม Y" : "Zoom Y"}
-            </div>
+          <div
+            ref={dailyChartInteractionRef}
+            className="mt-4 h-72 min-w-0"
+            onWheel={handleDailyChartWheelEvent}
+            onTouchStart={handleDailyChartTouchStart}
+            onTouchMove={handleDailyChartTouchMove}
+            onTouchEnd={handleDailyChartTouchEnd}
+            style={{ touchAction: "none" }}
+          >
             <div
               ref={dailyChartScrollRef}
-              className="min-w-0 overflow-x-auto overflow-y-hidden rounded-2xl cursor-grab active:cursor-grabbing"
+              className="h-full min-w-0 overflow-x-auto overflow-y-hidden rounded-2xl cursor-grab active:cursor-grabbing"
               onPointerDown={handleDailyChartPointerDown}
               onPointerMove={handleDailyChartPointerMove}
               onPointerUp={handleDailyChartPointerEnd}
@@ -775,18 +793,6 @@ export function DashboardPage() {
                   </ResponsiveContainer>
                 ) : null}
               </div>
-            </div>
-            <div className="row-start-2" />
-            <div
-              ref={dailyChartXAxisZoomRef}
-              className="row-start-2 flex cursor-ew-resize items-center justify-center rounded-2xl bg-slate-50 text-[11px] font-semibold text-slate-500 select-none dark:bg-white/5 dark:text-slate-400"
-              onWheel={(event) => handleDailyChartWheelEvent("x", event)}
-              onTouchStart={(event) => handleDailyChartTouchStart("x", event)}
-              onTouchMove={(event) => handleDailyChartTouchMove("x", event)}
-              onTouchEnd={handleDailyChartTouchEnd}
-              style={{ touchAction: "none" }}
-            >
-              {locale === "th" ? "ซูม X / ลากเลื่อนกราฟ" : "Zoom X / drag to pan"}
             </div>
           </div>
         </Card>
