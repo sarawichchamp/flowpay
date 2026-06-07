@@ -196,13 +196,44 @@ function AttachmentPicker({
   );
 }
 
+function SegmentedButtonGroup<T extends string>({
+  value,
+  options,
+  onChange,
+  className
+}: {
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-wrap gap-2", className)}>
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <Button
+            key={option.value}
+            type="button"
+            size="sm"
+            variant={selected ? "primary" : "secondary"}
+            className={cn("min-w-fit rounded-xl", selected ? "shadow-none" : undefined)}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function TransactionsPage() {
   const { locale } = useLocale();
   const { currentCycle, transactions, addTransactions, updateTransaction, deleteTransaction, resetDemoData, users, mode, transactionTypePresets } =
     useFlowPayStore();
   const copy = transactionsCopy(locale);
   const compactFieldClass = "h-10 rounded-xl px-3 text-sm";
-  const compactSelectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10";
   const [drafts, setDrafts] = useState<DraftTransaction[]>([createDraftTransaction(users[0].id, transactionTypePresets)]);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<DraftTransaction>(createDraftTransaction(users[0].id, transactionTypePresets, "edit-draft"));
@@ -232,6 +263,19 @@ export function TransactionsPage() {
   function resetBatchForm() {
     setDrafts([createDraftTransaction(users[0].id, transactionTypePresets)]);
     setSubmitError("");
+  }
+
+  function confirmAndResetBatchForm() {
+    const confirmMessage =
+      locale === "th" ? "ยืนยันการรีเซ็ตข้อมูลในฟอร์มนี้?" : "Reset all current form rows?";
+    if (!window.confirm(confirmMessage)) return;
+
+    if (mode === "demo") {
+      resetDemoData();
+      return;
+    }
+
+    resetBatchForm();
   }
 
   function resetEditForm() {
@@ -426,6 +470,18 @@ export function TransactionsPage() {
 
   const previewIsPdf = previewAttachmentUrl?.toLowerCase().includes(".pdf") ?? false;
   const previewFileName = getAttachmentName(previewAttachmentUrl);
+  const payerOptions = users.map((user) => ({
+    value: user.id,
+    label: user.displayName
+  }));
+  const presetOptions = transactionTypePresets.map((option) => ({
+    value: option.id,
+    label: option.label
+  }));
+  const splitOptions = splitTypeOptions.map((option) => ({
+    value: option.value,
+    label: t(locale, option.labelKey)
+  }));
 
   return (
     <div className="grid gap-3 xl:grid-cols-[0.92fr_1.08fr]">
@@ -442,65 +498,47 @@ export function TransactionsPage() {
 
         {editingTransactionId ? (
           <form className="mt-4 space-y-2.5" onSubmit={handleEditSubmit}>
-            <div className="grid gap-2.5 md:grid-cols-[1.2fr_0.8fr_0.9fr]">
-              <Field label={t(locale, "title")}>
-                    <Input className={compactFieldClass} value={editDraft.title} onChange={(event) => updateEditDraft({ title: event.target.value })} />
-                  </Field>
-                  <Field label={t(locale, "date")}>
-                    <Input className={compactFieldClass} type="date" value={editDraft.date} onChange={(event) => updateEditDraft({ date: event.target.value })} />
-                  </Field>
-                  <Field label={t(locale, "amount")}>
-                    <Input
-                      className={compactFieldClass}
-                      type="number"
-                      min="0"
-                      step="0.01"
+            <Field label={t(locale, "title")}>
+              <Input className={compactFieldClass} value={editDraft.title} onChange={(event) => updateEditDraft({ title: event.target.value })} />
+            </Field>
+            <div className="grid gap-2.5 grid-cols-2">
+              <Field label={t(locale, "date")}>
+                <Input className={compactFieldClass} type="date" value={editDraft.date} onChange={(event) => updateEditDraft({ date: event.target.value })} />
+              </Field>
+              <Field label={t(locale, "amount")}>
+                <Input
+                  className={compactFieldClass}
+                  type="number"
+                  min="0"
+                  step="0.01"
                   value={editDraft.amount}
                   onChange={(event) => updateEditDraft({ amount: event.target.value })}
                 />
               </Field>
             </div>
             <div className={editDraft.transactionType === "food" ? "grid gap-2.5 md:grid-cols-[1fr_1fr]" : "grid gap-2.5 md:grid-cols-[1fr_1fr_1fr]"}>
-                <Field label={copy.typeLabel}>
-                  <select
-                    className={compactSelectClass}
-                    value={editDraft.transactionPresetId}
-                    onChange={(event) => updateEditDraft({ transactionPresetId: event.target.value })}
-                  >
-                  {transactionTypePresets.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+              <Field label={copy.typeLabel}>
+                <SegmentedButtonGroup
+                  value={editDraft.transactionPresetId}
+                  options={presetOptions}
+                  onChange={(value) => updateEditDraft({ transactionPresetId: value })}
+                />
               </Field>
               {editDraft.transactionType !== "food" ? (
                 <Field label={t(locale, "settlement")}>
-                  <select
-                    className={compactSelectClass}
+                  <SegmentedButtonGroup
                     value={editDraft.splitType}
-                    onChange={(event) => updateEditDraft({ splitType: event.target.value as SplitType })}
-                  >
-                    {splitTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {t(locale, option.labelKey)}
-                      </option>
-                    ))}
-                  </select>
+                    options={splitOptions}
+                    onChange={(value) => updateEditDraft({ splitType: value })}
+                  />
                 </Field>
               ) : null}
               <Field label={t(locale, "paid")}>
-                <select
-                  className={compactSelectClass}
+                <SegmentedButtonGroup
                   value={editDraft.payerUserId}
-                  onChange={(event) => updateEditDraft({ payerUserId: event.target.value })}
-                >
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.displayName} {t(locale, "paid")}
-                    </option>
-                  ))}
-                </select>
+                  options={payerOptions}
+                  onChange={(value) => updateEditDraft({ payerUserId: value })}
+                />
               </Field>
             </div>
             <AttachmentPicker
@@ -543,10 +581,10 @@ export function TransactionsPage() {
                     <span className="hidden sm:inline">{copy.removeRow}</span>
                   </Button>
                 </div>
-                <div className="grid gap-2.5 md:grid-cols-[1.3fr_0.75fr_0.75fr]">
-                  <Field label={t(locale, "title")}>
-                    <Input className={compactFieldClass} value={draft.title} onChange={(event) => updateDraft(draft.localId, { title: event.target.value })} />
-                  </Field>
+                <Field label={t(locale, "title")}>
+                  <Input className={compactFieldClass} value={draft.title} onChange={(event) => updateDraft(draft.localId, { title: event.target.value })} />
+                </Field>
+                <div className="grid gap-2.5 grid-cols-2">
                   <Field label={t(locale, "date")}>
                     <Input className={compactFieldClass} type="date" value={draft.date} onChange={(event) => updateDraft(draft.localId, { date: event.target.value })} />
                   </Field>
@@ -563,45 +601,27 @@ export function TransactionsPage() {
                 </div>
                 <div className={draft.transactionType === "food" ? "mt-2.5 grid gap-2.5 md:grid-cols-[1fr_1fr]" : "mt-2.5 grid gap-2.5 md:grid-cols-[1fr_1fr_1fr_1fr]"}>
                   <Field label={copy.typeLabel}>
-                    <select
-                      className={compactSelectClass}
+                    <SegmentedButtonGroup
                       value={draft.transactionPresetId}
-                      onChange={(event) => updateDraft(draft.localId, { transactionPresetId: event.target.value })}
-                    >
-                      {transactionTypePresets.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      options={presetOptions}
+                      onChange={(value) => updateDraft(draft.localId, { transactionPresetId: value })}
+                    />
                   </Field>
                   {draft.transactionType !== "food" ? (
                     <Field label={t(locale, "settlement")}>
-                      <select
-                        className={compactSelectClass}
+                      <SegmentedButtonGroup
                         value={draft.splitType}
-                        onChange={(event) => updateDraft(draft.localId, { splitType: event.target.value as SplitType })}
-                      >
-                        {splitTypeOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {t(locale, option.labelKey)}
-                          </option>
-                        ))}
-                      </select>
+                        options={splitOptions}
+                        onChange={(value) => updateDraft(draft.localId, { splitType: value })}
+                      />
                     </Field>
                   ) : null}
                   <Field label={t(locale, "paid")}>
-                    <select
-                      className={compactSelectClass}
+                    <SegmentedButtonGroup
                       value={draft.payerUserId}
-                      onChange={(event) => updateDraft(draft.localId, { payerUserId: event.target.value })}
-                    >
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.displayName} {t(locale, "paid")}
-                        </option>
-                      ))}
-                    </select>
+                      options={payerOptions}
+                      onChange={(value) => updateDraft(draft.localId, { payerUserId: value })}
+                    />
                   </Field>
                 </div>
                 <div className="mt-2.5">
@@ -615,16 +635,20 @@ export function TransactionsPage() {
                 </div>
               </div>
             ))}
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[auto_auto_1fr_auto]">
-              <Button type="button" variant="ghost" onClick={() => (mode === "demo" ? resetDemoData() : resetBatchForm())}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                onClick={confirmAndResetBatchForm}
+              >
                 {copy.reset}
               </Button>
               <Button type="button" variant="secondary" onClick={addRow}>
                 <Plus className="h-4 w-4" />
                 {copy.addRow}
               </Button>
-              <div className="hidden xl:block" />
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" disabled={isSaving} className="ml-auto">
                 {copy.saveAll}
               </Button>
             </div>
