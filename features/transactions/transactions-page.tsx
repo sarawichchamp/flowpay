@@ -120,6 +120,10 @@ function resolvePreset(transactionTypePresets: TransactionTypePreset[], presetId
   );
 }
 
+function getDefaultSplitTypeForTransactionType(transactionType: TransactionType) {
+  return transactionType === "food" ? "no_split" : "split_half";
+}
+
 let draftIdCounter = 1;
 
 function nextDraftLocalId() {
@@ -178,7 +182,7 @@ function AttachmentPicker({
     <div className="flex flex-wrap items-center gap-2">
       <label
         htmlFor={inputId}
-        className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white/70 px-3 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition hover:bg-white dark:bg-white/10 dark:text-white dark:ring-white/10"
+        className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white/70 px-3 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition hover:bg-white dark:bg-white/10 dark:text-white dark:ring-white/10 dark:hover:bg-white/15 dark:hover:text-white"
       >
         <Camera className="h-4 w-4" />
         {t(locale, "attach")}
@@ -291,8 +295,12 @@ export function TransactionsPage() {
         const next = { ...draft, ...patch };
         if (patch.transactionPresetId) {
           const preset = resolvePreset(transactionTypePresets, patch.transactionPresetId);
+          const previousTransactionType = draft.transactionType;
           next.transactionPresetId = preset.id;
           next.transactionType = preset.baseType;
+          if (preset.baseType !== previousTransactionType) {
+            next.splitType = getDefaultSplitTypeForTransactionType(preset.baseType);
+          }
         }
         if (next.transactionType === "food") {
           next.splitType = "no_split";
@@ -307,8 +315,12 @@ export function TransactionsPage() {
       const next = { ...current, ...patch };
       if (patch.transactionPresetId) {
         const preset = resolvePreset(transactionTypePresets, patch.transactionPresetId);
+        const previousTransactionType = current.transactionType;
         next.transactionPresetId = preset.id;
         next.transactionType = preset.baseType;
+        if (preset.baseType !== previousTransactionType) {
+          next.splitType = getDefaultSplitTypeForTransactionType(preset.baseType);
+        }
       }
       if (next.transactionType === "food") {
         next.splitType = "no_split";
@@ -635,20 +647,20 @@ export function TransactionsPage() {
                 </div>
               </div>
             ))}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <Button
                 type="button"
                 variant="ghost"
-                className="text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                className="w-full !text-red-500 hover:bg-red-50 hover:!text-red-600 dark:hover:bg-red-500/10 dark:hover:!text-red-400"
                 onClick={confirmAndResetBatchForm}
               >
                 {copy.reset}
               </Button>
-              <Button type="button" variant="secondary" onClick={addRow}>
+              <Button type="button" variant="secondary" className="w-full" onClick={addRow}>
                 <Plus className="h-4 w-4" />
                 {copy.addRow}
               </Button>
-              <Button type="submit" disabled={isSaving} className="ml-auto">
+              <Button type="submit" disabled={isSaving} className="w-full">
                 {copy.saveAll}
               </Button>
             </div>
@@ -692,7 +704,7 @@ export function TransactionsPage() {
                           onClick={() => setPreviewAttachmentUrl(transaction.attachmentUrl ?? null)}
                           className={cn(
                             "inline-flex h-9 items-center justify-center gap-2 rounded-2xl bg-white/70 px-2 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition active:scale-[0.98] hover:bg-white",
-                            "dark:bg-white/10 dark:text-white dark:ring-white/10"
+                            "dark:bg-white/10 dark:text-white dark:ring-white/10 dark:hover:bg-white/15 dark:hover:text-white"
                           )}
                         >
                           <ExternalLink className="h-4 w-4" />
@@ -734,7 +746,7 @@ export function TransactionsPage() {
                   rel="noreferrer"
                   className={cn(
                     "inline-flex h-9 items-center justify-center gap-2 rounded-2xl bg-white/70 px-3 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition hover:bg-white",
-                    "dark:bg-white/10 dark:text-white dark:ring-white/10"
+                    "dark:bg-white/10 dark:text-white dark:ring-white/10 dark:hover:bg-white/15 dark:hover:text-white"
                   )}
                 >
                   <ExternalLink className="h-4 w-4" />
