@@ -1,10 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getAppMode } from "@/services/flowpay/app-mode";
+import { getAppMode, isSupabaseDemoMode } from "@/services/flowpay/app-mode";
 import { isAuthenticatedHouseholdMember } from "@/services/flowpay/auth";
 import { updateSession } from "@/services/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);
+  if (isSupabaseDemoMode()) {
+    return response;
+  }
+
   const { pathname } = request.nextUrl;
   const requiresReauth = request.nextUrl.searchParams.get("reauth") === "1";
   const isUnlockRoute = pathname.startsWith("/unlock");

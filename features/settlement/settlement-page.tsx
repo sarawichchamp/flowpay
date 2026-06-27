@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
 import { createClient } from "@/services/supabase/browser";
 import type { Profile } from "@/types/domain";
-import { cn } from "@/utils/cn";
 import type { SummaryRow } from "./types";
 
 function formatCycleLabel(locale: "th" | "en", startDate: string) {
@@ -18,6 +17,13 @@ function formatCycleLabel(locale: "th" | "en", startDate: string) {
     month: "long",
     year: "numeric"
   }).format(new Date(`${startDate}T00:00:00`));
+}
+
+function formatBudgetValue(locale: "th" | "en", value: number) {
+  return new Intl.NumberFormat(locale === "th" ? "th-TH" : "en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  }).format(value);
 }
 
 function settlementCopy(locale: "th" | "en") {
@@ -59,6 +65,7 @@ export function SettlementPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [savingCycleId, setSavingCycleId] = useState<string | null>(null);
+  const [editingCycleId, setEditingCycleId] = useState<string | null>(null);
 
   async function loadSummaries() {
     setError("");
@@ -134,7 +141,26 @@ export function SettlementPage() {
     }
 
     setMessage(copy.updated);
+    setEditingCycleId(null);
     await loadSummaries();
+  }
+
+  function startEditing(cycleId: string, currentBudget: number) {
+    setError("");
+    setMessage("");
+    setBudgetDrafts((current) => ({
+      ...current,
+      [cycleId]: String(currentBudget)
+    }));
+    setEditingCycleId(cycleId);
+  }
+
+  function cancelEditing(cycleId: string, currentBudget: number) {
+    setBudgetDrafts((current) => ({
+      ...current,
+      [cycleId]: String(currentBudget)
+    }));
+    setEditingCycleId((activeCycleId) => (activeCycleId === cycleId ? null : activeCycleId));
   }
 
   return (
@@ -148,44 +174,69 @@ export function SettlementPage() {
       {message ? <p className="text-sm text-teal-600 dark:text-teal-300">{message}</p> : null}
 
       <Card className="p-4">
-        <div className="grid gap-3 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400 md:grid-cols-[minmax(0,1fr)_170px_140px]">
+        <div className="border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-white/10 dark:text-slate-400">
           <p>{copy.cycleColumn}</p>
-          <p className="md:text-right">{copy.budgetColumn}</p>
-          <p className="md:text-right">{copy.open}</p>
         </div>
         <div className="divide-y divide-slate-200 dark:divide-white/10">
           {summaries.length ? summaries.map((summary) => (
-            <div key={summary.cycle.id} className="grid gap-3 py-3 md:grid-cols-[minmax(0,1fr)_170px_140px] md:items-center">
-              <div className="min-w-0">
-                <p className="font-semibold">{formatCycleLabel(locale, summary.cycle.startDate)}</p>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            <div key={summary.cycle.id} className="flex items-center justify-between gap-3 py-3">
+              <Link href={`/settlement/${encodeURIComponent(summary.cycle.startDate)}`} className="min-w-0 flex-1">
+                <p className="truncate font-semibold transition hover:text-teal-600 dark:hover:text-teal-300">
+                  {formatCycleLabel(locale, summary.cycle.startDate)}
+                </p>
+                <p className="mt-0.5 hidden text-xs text-slate-500 dark:text-slate-400 md:block">
                   {summary.cycle.startDate} - {summary.cycle.endDate}
                 </p>
-              </div>
-              <div className="flex items-center gap-2 md:justify-end">
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={budgetDrafts[summary.cycle.id] ?? ""}
-                  onChange={(event) => setBudgetDrafts((current) => ({ ...current, [summary.cycle.id]: event.target.value }))}
-                  className="h-10 rounded-xl px-3 text-right text-sm"
-                />
-                <Button type="button" size="icon" onClick={() => void saveBudget(summary.cycle.id)} disabled={savingCycleId === summary.cycle.id}>
-                  <Check className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="md:justify-self-end">
-                <Link
-                  href={`/settlement/${encodeURIComponent(summary.cycle.startDate)}`}
-                  className={cn(
-                    "inline-flex h-10 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-semibold transition active:scale-[0.98]",
-                    "bg-white/70 text-slate-950 ring-1 ring-slate-200 hover:bg-white dark:bg-white/10 dark:text-white dark:ring-white/10"
-                  )}
-                >
-                  {copy.open}
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
+              </Link>
+              <div className="flex shrink-0 items-center gap-1">
+                {editingCycleId === summary.cycle.id ? (
+                  <>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={budgetDrafts[summary.cycle.id] ?? ""}
+                      onChange={(event) =>
+                        setBudgetDrafts((current) => ({ ...current, [summary.cycle.id]: event.target.value }))
+                      }
+                      className="h-9 w-28 rounded-xl px-3 text-right text-sm"
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl"
+                      onClick={() => void saveBudget(summary.cycle.id)}
+                      disabled={savingCycleId === summary.cycle.id}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl"
+                      onClick={() => cancelEditing(summary.cycle.id, summary.cycle.foodBudgetTarget)}
+                      disabled={savingCycleId === summary.cycle.id}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+                      {formatBudgetValue(locale, summary.cycle.foodBudgetTarget)}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl"
+                      onClick={() => startEditing(summary.cycle.id, summary.cycle.foodBudgetTarget)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           )) : (

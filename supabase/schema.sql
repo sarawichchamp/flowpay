@@ -85,12 +85,25 @@ create table public.notifications (
   created_at timestamptz not null default now()
 );
 
+create table public.translation_pairs (
+  id uuid primary key default gen_random_uuid(),
+  translation_key text not null unique,
+  thai_text text not null,
+  english_text text not null,
+  source_file text not null default '',
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint translation_pairs_key_length check (char_length(translation_key) between 1 and 100)
+);
+
 create index billing_cycles_date_range_idx on public.billing_cycles (start_date, end_date);
 create index transactions_cycle_date_idx on public.transactions (billing_cycle_id, date desc);
 create index transactions_payer_idx on public.transactions (payer_user_id);
 create index transactions_type_idx on public.transactions (transaction_type);
 create index installments_payer_idx on public.installments (payer_user_id);
 create index notifications_recipient_unread_idx on public.notifications (recipient_user_id, read_at, created_at desc);
+create index translation_pairs_key_idx on public.translation_pairs (translation_key);
 
 alter table public.profiles enable row level security;
 alter table public.billing_cycles enable row level security;
@@ -99,6 +112,7 @@ alter table public.transactions enable row level security;
 alter table public.installments enable row level security;
 alter table public.installment_transactions enable row level security;
 alter table public.notifications enable row level security;
+alter table public.translation_pairs enable row level security;
 
 create or replace function public.is_household_member(user_id uuid)
 returns boolean
@@ -178,6 +192,12 @@ to authenticated
 using (recipient_user_id = auth.uid())
 with check (recipient_user_id = auth.uid());
 
+create policy "household can manage translation pairs"
+on public.translation_pairs for all
+to authenticated
+using (public.is_household_member(auth.uid()))
+with check (public.is_household_member(auth.uid()));
+
 insert into public.categories (name, icon, color, is_default)
 values
   ('Food', 'Utensils', '#14b8a6', true),
@@ -220,3 +240,17 @@ $$;
 create trigger transaction_notification_after_insert
 after insert on public.transactions
 for each row execute function public.create_transaction_notification();
+
+create or replace function public.touch_translation_pairs_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger translation_pairs_touch_updated_at
+before update on public.translation_pairs
+for each row execute function public.touch_translation_pairs_updated_at();

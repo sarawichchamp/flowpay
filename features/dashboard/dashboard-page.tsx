@@ -549,6 +549,21 @@ export function DashboardPage() {
     detailsModalType === "food" ? settlement.food.spent : detailsModalType === "other" ? otherExpenseTotal : installmentTotal;
   const detailSummaryLabel = detailsModalType === "food" ? copy.averageDailyFoodLabel : null;
   const detailSummaryValue = detailsModalType === "food" ? settlement.food.averageDailySpending : null;
+  const detailTransactionGroups = useMemo(() => {
+    const grouped = new Map<string, typeof detailTransactions>();
+
+    for (const transaction of detailTransactions) {
+      const existing = grouped.get(transaction.date);
+      if (existing) {
+        existing.push(transaction);
+        continue;
+      }
+
+      grouped.set(transaction.date, [transaction]);
+    }
+
+    return Array.from(grouped.entries()).map(([date, items]) => ({ date, items }));
+  }, [detailTransactions]);
 
   return (
     <div className="space-y-6">
@@ -627,7 +642,7 @@ export function DashboardPage() {
       </section>
 
       {detailsModalType ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onClick={() => setDetailsModalType(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-4" onClick={() => setDetailsModalType(null)}>
           <Card className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden p-0" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">
               <div>
@@ -665,7 +680,7 @@ export function DashboardPage() {
                     </div>
                   ) : null}
                 </div>
-                <div className="min-w-[720px]">
+                <div className="hidden md:block">
                   <div className="grid grid-cols-[92px_minmax(0,1fr)_110px_220px] gap-3 bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
                     <span>{copy.itemDate}</span>
                     <span>{copy.itemTitle}</span>
@@ -705,6 +720,59 @@ export function DashboardPage() {
                       </div>
                     );
                   })}
+                </div>
+                <div className="space-y-4 p-4 md:hidden">
+                  {detailTransactionGroups.map((group) => (
+                    <div key={group.date} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+                      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-white/10">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{copy.itemDate}</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">{formatShortDate(group.date)}</p>
+                        </div>
+                        <Badge>{group.items.length} {t(locale, "items")}</Badge>
+                      </div>
+
+                      <div className="mt-3 space-y-3">
+                        {group.items.map((transaction) => {
+                          const payer = users.find((user) => user.id === transaction.payerUserId);
+                          const paidAhead = detailsModalType === "food" && transaction.payerUserId !== currentCycle.foodWalletHolderUserId;
+                          const installmentProgress = detailsModalType === "installment" ? parseInstallmentProgress(transaction.title) : null;
+
+                          return (
+                            <div key={transaction.id} className="rounded-2xl bg-white px-4 py-3 shadow-sm dark:bg-white/[0.04]">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p
+                                    className="text-sm font-semibold text-slate-950 dark:text-white"
+                                    style={{
+                                      display: "-webkit-box",
+                                      WebkitBoxOrient: "vertical",
+                                      WebkitLineClamp: 2,
+                                      overflow: "hidden"
+                                    }}
+                                  >
+                                    {installmentProgress ? installmentProgress.baseTitle : transaction.title}
+                                  </p>
+                                  {installmentProgress ? (
+                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{formatInstallmentProgressLabel(locale, transaction.title)}</p>
+                                  ) : null}
+                                </div>
+                                <p className="shrink-0 text-right text-base font-bold text-slate-950 dark:text-white">{formatTHB(transaction.amount)}</p>
+                              </div>
+                              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                                <span>{payer?.displayName ?? "-"}</span>
+                                {paidAhead ? (
+                                  <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
+                                    {(payer?.displayName ?? "-") + " " + copy.paidAhead}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ) : (

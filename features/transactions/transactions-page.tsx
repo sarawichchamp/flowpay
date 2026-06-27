@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Camera, ExternalLink, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -179,10 +180,10 @@ function AttachmentPicker({
   onChange: (file?: File) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-1.5">
       <label
         htmlFor={inputId}
-        className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white/70 px-3 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition hover:bg-white dark:bg-white/10 dark:text-white dark:ring-white/10 dark:hover:bg-white/15 dark:hover:text-white"
+        className="inline-flex h-6.5 cursor-pointer items-center justify-center gap-1 rounded-lg bg-white/70 px-2 text-[11px] font-semibold text-slate-950 ring-1 ring-slate-200 transition hover:bg-white dark:bg-white/10 dark:text-white dark:ring-white/10 dark:hover:bg-white/15 dark:hover:text-white"
       >
         <Camera className="h-4 w-4" />
         {t(locale, "attach")}
@@ -195,7 +196,7 @@ function AttachmentPicker({
         disabled={disabled}
         onChange={(event) => onChange(event.target.files?.[0])}
       />
-      {fileName ? <p className="min-w-0 truncate text-xs text-slate-500 dark:text-slate-400">{fileName}</p> : null}
+      {fileName ? <p className="min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400">{fileName}</p> : null}
     </div>
   );
 }
@@ -212,7 +213,7 @@ function SegmentedButtonGroup<T extends string>({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-wrap gap-2", className)}>
+    <div className={cn("flex flex-wrap gap-1.5", className)}>
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -221,7 +222,7 @@ function SegmentedButtonGroup<T extends string>({
             type="button"
             size="sm"
             variant={selected ? "primary" : "secondary"}
-            className={cn("min-w-fit rounded-xl", selected ? "shadow-none" : undefined)}
+            className={cn("h-7 min-w-fit rounded-lg px-2 text-[11px]", selected ? "shadow-none" : undefined)}
             onClick={() => onChange(option.value)}
           >
             {option.label}
@@ -237,7 +238,7 @@ export function TransactionsPage() {
   const { currentCycle, transactions, addTransactions, updateTransaction, deleteTransaction, resetDemoData, users, mode, transactionTypePresets } =
     useFlowPayStore();
   const copy = transactionsCopy(locale);
-  const compactFieldClass = "h-10 rounded-xl px-3 text-sm";
+  const compactFieldClass = "h-7 rounded-lg px-2.5 text-[13px]";
   const [drafts, setDrafts] = useState<DraftTransaction[]>([createDraftTransaction(users[0].id, transactionTypePresets)]);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<DraftTransaction>(createDraftTransaction(users[0].id, transactionTypePresets, "edit-draft"));
@@ -494,179 +495,114 @@ export function TransactionsPage() {
     value: option.value,
     label: t(locale, option.labelKey)
   }));
+  const userNameById = new Map(users.map((user) => [user.id, user.displayName]));
 
   return (
-    <div className="grid gap-3 xl:grid-cols-[0.92fr_1.08fr]">
-      <Card className="overflow-hidden p-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
-            <Plus className="h-5 w-5" />
+    <div className="grid gap-2.5 xl:grid-cols-[0.92fr_1.08fr]">
+      <Card className="overflow-hidden p-3 sm:p-4">
+        <div className="flex items-start gap-2.5">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
+            <Plus className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-lg font-bold sm:text-xl">{editingTransactionId ? copy.editTitle : copy.addTitle}</h1>
+            <h1 className="text-lg font-bold sm:text-xl">{copy.addTitle}</h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
           </div>
         </div>
-
-        {editingTransactionId ? (
-          <form className="mt-4 space-y-2.5" onSubmit={handleEditSubmit}>
-            <Field label={t(locale, "title")}>
-              <Input className={compactFieldClass} value={editDraft.title} onChange={(event) => updateEditDraft({ title: event.target.value })} />
-            </Field>
-            <div className="grid gap-2.5 grid-cols-2">
-              <Field label={t(locale, "date")}>
-                <Input className={compactFieldClass} type="date" value={editDraft.date} onChange={(event) => updateEditDraft({ date: event.target.value })} />
-              </Field>
-              <Field label={t(locale, "amount")}>
-                <Input
-                  className={compactFieldClass}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={editDraft.amount}
-                  onChange={(event) => updateEditDraft({ amount: event.target.value })}
-                />
-              </Field>
-            </div>
-            <div className={editDraft.transactionType === "food" ? "grid gap-2.5 md:grid-cols-[1fr_1fr]" : "grid gap-2.5 md:grid-cols-[1fr_1fr_1fr]"}>
-              <Field label={copy.typeLabel}>
-                <SegmentedButtonGroup
-                  value={editDraft.transactionPresetId}
-                  options={presetOptions}
-                  onChange={(value) => updateEditDraft({ transactionPresetId: value })}
-                />
-              </Field>
-              {editDraft.transactionType !== "food" ? (
-                <Field label={t(locale, "settlement")}>
-                  <SegmentedButtonGroup
-                    value={editDraft.splitType}
-                    options={splitOptions}
-                    onChange={(value) => updateEditDraft({ splitType: value })}
-                  />
-                </Field>
-              ) : null}
-              <Field label={t(locale, "paid")}>
-                <SegmentedButtonGroup
-                  value={editDraft.payerUserId}
-                  options={payerOptions}
-                  onChange={(value) => updateEditDraft({ payerUserId: value })}
-                />
-              </Field>
-            </div>
-            <AttachmentPicker
-              locale={locale}
-              inputId={`transaction-edit-attachment-${editingTransactionId}`}
-              fileName={editDraft.attachmentName}
-              disabled={isSaving}
-              onChange={setEditAttachment}
-            />
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Button type="button" variant="ghost" onClick={resetEditForm}>
-                <X className="h-4 w-4" />
-                {copy.cancelEdit}
-              </Button>
-              <div className="hidden flex-1 sm:block" />
-              <Button type="submit" disabled={isSaving}>
-                {copy.update}
-              </Button>
-            </div>
-            {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
-          </form>
-        ) : (
-          <form className="mt-4 space-y-2.5" onSubmit={handleBatchSubmit}>
-            {drafts.map((draft, index) => (
-              <div key={draft.localId} className="rounded-xl border border-slate-200 p-2 dark:border-white/10">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    {copy.rowLabel} {index + 1}
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="shrink-0 px-2"
-                    onClick={() => removeRow(draft.localId)}
-                    disabled={drafts.length === 1}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sm:hidden">{copy.delete}</span>
-                    <span className="hidden sm:inline">{copy.removeRow}</span>
-                  </Button>
-                </div>
-                <Field label={t(locale, "title")}>
-                  <Input className={compactFieldClass} value={draft.title} onChange={(event) => updateDraft(draft.localId, { title: event.target.value })} />
-                </Field>
-                <div className="grid gap-2.5 grid-cols-2">
-                  <Field label={t(locale, "date")}>
-                    <Input className={compactFieldClass} type="date" value={draft.date} onChange={(event) => updateDraft(draft.localId, { date: event.target.value })} />
-                  </Field>
-                  <Field label={t(locale, "amount")}>
-                    <Input
-                      className={compactFieldClass}
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={draft.amount}
-                      onChange={(event) => updateDraft(draft.localId, { amount: event.target.value })}
-                    />
-                  </Field>
-                </div>
-                <div className={draft.transactionType === "food" ? "mt-2.5 grid gap-2.5 md:grid-cols-[1fr_1fr]" : "mt-2.5 grid gap-2.5 md:grid-cols-[1fr_1fr_1fr_1fr]"}>
-                  <Field label={copy.typeLabel}>
-                    <SegmentedButtonGroup
-                      value={draft.transactionPresetId}
-                      options={presetOptions}
-                      onChange={(value) => updateDraft(draft.localId, { transactionPresetId: value })}
-                    />
-                  </Field>
-                  {draft.transactionType !== "food" ? (
-                    <Field label={t(locale, "settlement")}>
-                      <SegmentedButtonGroup
-                        value={draft.splitType}
-                        options={splitOptions}
-                        onChange={(value) => updateDraft(draft.localId, { splitType: value })}
-                      />
-                    </Field>
-                  ) : null}
-                  <Field label={t(locale, "paid")}>
-                    <SegmentedButtonGroup
-                      value={draft.payerUserId}
-                      options={payerOptions}
-                      onChange={(value) => updateDraft(draft.localId, { payerUserId: value })}
-                    />
-                  </Field>
-                </div>
-                <div className="mt-2.5">
-                  <AttachmentPicker
-                    locale={locale}
-                    inputId={`transaction-attachment-${draft.localId}`}
-                    fileName={draft.attachmentName}
-                    disabled={isSaving}
-                    onChange={(file) => setDraftAttachment(draft.localId, file)}
-                  />
-                </div>
+        <form className="mt-3 space-y-1.5" onSubmit={handleBatchSubmit}>
+          {drafts.map((draft, index) => (
+            <div key={draft.localId} className="rounded-lg border border-slate-200 p-1.5 dark:border-white/10">
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-1">
+                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  {copy.rowLabel} {index + 1}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-6.5 shrink-0 rounded-lg px-2 text-[11px]"
+                  onClick={() => removeRow(draft.localId)}
+                  disabled={drafts.length === 1}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sm:hidden">{copy.delete}</span>
+                  <span className="hidden sm:inline">{copy.removeRow}</span>
+                </Button>
               </div>
-            ))}
-            <div className="grid grid-cols-3 gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full !text-red-500 hover:bg-red-50 hover:!text-red-600 dark:hover:bg-red-500/10 dark:hover:!text-red-400"
-                onClick={confirmAndResetBatchForm}
-              >
-                {copy.reset}
-              </Button>
-              <Button type="button" variant="secondary" className="w-full" onClick={addRow}>
-                <Plus className="h-4 w-4" />
-                {copy.addRow}
-              </Button>
-              <Button type="submit" disabled={isSaving} className="w-full">
-                {copy.saveAll}
-              </Button>
+              <Field label={t(locale, "title")}>
+                <Input className={compactFieldClass} value={draft.title} onChange={(event) => updateDraft(draft.localId, { title: event.target.value })} />
+              </Field>
+              <div className="grid grid-cols-2 gap-1.5">
+                <Field label={t(locale, "date")}>
+                  <Input className={compactFieldClass} type="date" value={draft.date} onChange={(event) => updateDraft(draft.localId, { date: event.target.value })} />
+                </Field>
+                <Field label={t(locale, "amount")}>
+                  <Input
+                    className={compactFieldClass}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={draft.amount}
+                    onChange={(event) => updateDraft(draft.localId, { amount: event.target.value })}
+                  />
+                </Field>
+              </div>
+              <div className={draft.transactionType === "food" ? "mt-1.5 grid gap-1.5 md:grid-cols-[1fr_1fr]" : "mt-1.5 grid gap-1.5 md:grid-cols-[1fr_1fr_1fr_1fr]"}>
+                <Field label={copy.typeLabel}>
+                  <SegmentedButtonGroup
+                    value={draft.transactionPresetId}
+                    options={presetOptions}
+                    onChange={(value) => updateDraft(draft.localId, { transactionPresetId: value })}
+                  />
+                </Field>
+                {draft.transactionType !== "food" ? (
+                  <Field label={t(locale, "settlement")}>
+                    <SegmentedButtonGroup
+                      value={draft.splitType}
+                      options={splitOptions}
+                      onChange={(value) => updateDraft(draft.localId, { splitType: value })}
+                    />
+                  </Field>
+                ) : null}
+                <Field label={t(locale, "paid")}>
+                  <SegmentedButtonGroup
+                    value={draft.payerUserId}
+                    options={payerOptions}
+                    onChange={(value) => updateDraft(draft.localId, { payerUserId: value })}
+                  />
+                </Field>
+              </div>
+              <div className="mt-1.5">
+                <AttachmentPicker
+                  locale={locale}
+                  inputId={`transaction-attachment-${draft.localId}`}
+                  fileName={draft.attachmentName}
+                  disabled={isSaving}
+                  onChange={(file) => setDraftAttachment(draft.localId, file)}
+                />
+              </div>
             </div>
-            {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
-          </form>
-        )}
+          ))}
+          <div className="grid grid-cols-3 gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 w-full whitespace-nowrap px-2 text-[11px] !text-red-500 hover:bg-red-50 hover:!text-red-600 dark:hover:bg-red-500/10 dark:hover:!text-red-400"
+              onClick={confirmAndResetBatchForm}
+            >
+              {copy.reset}
+            </Button>
+            <Button type="button" variant="secondary" size="sm" className="h-7 w-full whitespace-nowrap px-2 text-[11px]" onClick={addRow}>
+              <Plus className="h-4 w-4" />
+              {copy.addRow}
+            </Button>
+            <Button type="submit" size="sm" disabled={isSaving} className="h-7 w-full whitespace-nowrap px-2 text-[10px] sm:text-[11px]">
+              {copy.saveAll}
+            </Button>
+          </div>
+          {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
+        </form>
       </Card>
 
       <Card className="overflow-hidden p-4 sm:p-5">
@@ -676,57 +612,168 @@ export function TransactionsPage() {
         </div>
         <div className="mt-3 space-y-1.5">
           {transactions.map((transaction) => (
-            <div key={transaction.id} className="rounded-xl border border-slate-200 px-3 py-2 dark:border-white/10">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{transaction.title}</p>
-                  <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                      {formatShortDate(transaction.date)} · {transaction.transactionType}
-                      {transaction.transactionType !== "food" ? ` · ${transaction.splitType}` : ""}
-                      {transaction.attachmentUrl ? " · att" : ""}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between gap-2 sm:justify-end">
-                  <div className="flex items-center gap-2">
-                    {editingTransactionId === transaction.id ? (
-                      <span className="shrink-0 text-[10px] font-semibold text-teal-600 dark:text-teal-300">{copy.editingBadge}</span>
-                    ) : null}
-                    <p className="shrink-0 text-sm font-black tabular-nums">{formatTHB(transaction.amount)}</p>
-                  </div>
-                  {transaction.transactionType === "installment" ? (
-                    <span className="shrink-0 text-[10px] text-slate-500 dark:text-slate-400">lock</span>
-                  ) : (
-                    <div className="flex shrink-0 gap-1">
-                      {transaction.attachmentUrl ? (
-                        <button
-                          type="button"
-                          aria-label={copy.openAttachment}
-                          onClick={() => setPreviewAttachmentUrl(transaction.attachmentUrl ?? null)}
-                          className={cn(
-                            "inline-flex h-9 items-center justify-center gap-2 rounded-2xl bg-white/70 px-2 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition active:scale-[0.98] hover:bg-white",
-                            "dark:bg-white/10 dark:text-white dark:ring-white/10 dark:hover:bg-white/15 dark:hover:text-white"
-                          )}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </button>
-                      ) : null}
-                      <Button type="button" size="sm" variant="secondary" className="px-2" onClick={() => startEditing(transaction)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="px-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
-                        onClick={() => void handleDelete(transaction)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+            <motion.div
+              key={transaction.id}
+              layout
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className={cn(
+                "rounded-xl border border-slate-200 px-3 py-2 dark:border-white/10",
+                editingTransactionId === transaction.id && "border-teal-500/40 bg-white/5"
+              )}
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                {editingTransactionId === transaction.id ? (
+                  <motion.form
+                    key="edit"
+                    layout
+                    initial={{ opacity: 0, y: 6, scale: 0.985 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.99 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    className="space-y-1.5"
+                    onSubmit={handleEditSubmit}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold text-teal-600 dark:text-teal-300">{copy.editingBadge}</p>
+                      <p className="text-sm font-black tabular-nums">{formatTHB(Number(editDraft.amount || 0))}</p>
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
+                    <Field label={t(locale, "title")}>
+                      <Input className={compactFieldClass} value={editDraft.title} onChange={(event) => updateEditDraft({ title: event.target.value })} />
+                    </Field>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <Field label={t(locale, "date")}>
+                        <Input className={compactFieldClass} type="date" value={editDraft.date} onChange={(event) => updateEditDraft({ date: event.target.value })} />
+                      </Field>
+                      <Field label={t(locale, "amount")}>
+                        <Input
+                          className={compactFieldClass}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editDraft.amount}
+                          onChange={(event) => updateEditDraft({ amount: event.target.value })}
+                        />
+                      </Field>
+                    </div>
+                    <Field label={copy.typeLabel}>
+                      <SegmentedButtonGroup
+                        value={editDraft.transactionPresetId}
+                        options={presetOptions}
+                        onChange={(value) => updateEditDraft({ transactionPresetId: value })}
+                      />
+                    </Field>
+                    {editDraft.transactionType !== "food" ? (
+                      <Field label={t(locale, "settlement")}>
+                        <SegmentedButtonGroup
+                          value={editDraft.splitType}
+                          options={splitOptions}
+                          onChange={(value) => updateEditDraft({ splitType: value })}
+                        />
+                      </Field>
+                    ) : null}
+                    <Field label={t(locale, "paid")}>
+                      <SegmentedButtonGroup
+                        value={editDraft.payerUserId}
+                        options={payerOptions}
+                        onChange={(value) => updateEditDraft({ payerUserId: value })}
+                      />
+                    </Field>
+                    <AttachmentPicker
+                      locale={locale}
+                      inputId={`transaction-edit-attachment-${transaction.id}`}
+                      fileName={editDraft.attachmentName}
+                      disabled={isSaving}
+                      onChange={setEditAttachment}
+                    />
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <div className="flex gap-1">
+                        {editDraft.attachmentUrl ? (
+                          <button
+                            type="button"
+                            aria-label={copy.openAttachment}
+                            onClick={() => setPreviewAttachmentUrl(editDraft.attachmentUrl ?? null)}
+                            className={cn(
+                              "inline-flex h-7 items-center justify-center gap-2 rounded-lg bg-white/70 px-2 text-[11px] font-semibold text-slate-950 ring-1 ring-slate-200 transition active:scale-[0.98] hover:bg-white",
+                              "dark:bg-white/10 dark:text-white dark:ring-white/10 dark:hover:bg-white/15 dark:hover:text-white"
+                            )}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </button>
+                        ) : null}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={resetEditForm}>
+                          <X className="h-3.5 w-3.5" />
+                          {copy.cancelEdit}
+                        </Button>
+                        <Button type="submit" size="sm" className="h-7 px-2 text-[11px]" disabled={isSaving}>
+                          {copy.update}
+                        </Button>
+                      </div>
+                    </div>
+                    {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
+                  </motion.form>
+                ) : (
+                  <motion.div
+                    key="display"
+                    layout
+                    initial={{ opacity: 0.92, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0.92, y: -2 }}
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="space-y-1"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{transaction.title}</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <p className="shrink-0 text-sm font-black tabular-nums">{formatTHB(transaction.amount)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        {formatShortDate(transaction.date)} · {transaction.transactionType}
+                        {transaction.transactionType !== "food" ? ` · ${transaction.splitType}` : ""}
+                        {` · ${userNameById.get(transaction.payerUserId) ?? "-"}`}
+                        {transaction.attachmentUrl ? " · att" : ""}
+                      </p>
+                      {transaction.transactionType === "installment" ? (
+                        <span className="shrink-0 text-[10px] text-slate-500 dark:text-slate-400">lock</span>
+                      ) : (
+                        <div className="flex shrink-0 gap-1">
+                          {transaction.attachmentUrl ? (
+                            <button
+                              type="button"
+                              aria-label={copy.openAttachment}
+                              onClick={() => setPreviewAttachmentUrl(transaction.attachmentUrl ?? null)}
+                              className={cn(
+                                "inline-flex h-9 items-center justify-center gap-2 rounded-2xl bg-white/70 px-2 text-sm font-semibold text-slate-950 ring-1 ring-slate-200 transition active:scale-[0.98] hover:bg-white",
+                                "dark:bg-white/10 dark:text-white dark:ring-white/10 dark:hover:bg-white/15 dark:hover:text-white"
+                              )}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                          <Button type="button" size="sm" variant="secondary" className="px-2" onClick={() => startEditing(transaction)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="px-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                            onClick={() => void handleDelete(transaction)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
           ))}
         </div>
       </Card>

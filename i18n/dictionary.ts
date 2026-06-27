@@ -1,6 +1,6 @@
 import type { Locale } from "@/types/domain";
 
-const dictionary = {
+export const dictionary = {
   th: {
     dashboard: "แดชบอร์ด",
     transactions: "ธุรกรรม",

@@ -1,8 +1,6 @@
-import js from "@eslint/js";
-import tseslint from "typescript-eslint";
+import tseslint from "./node_modules/.pnpm/node_modules/typescript-eslint/dist/index.js";
 
 const eslintConfig = [
-  js.configs.recommended,
   ...tseslint.configs.recommended,
   {
     ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"]

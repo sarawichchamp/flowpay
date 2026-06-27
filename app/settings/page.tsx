@@ -10,6 +10,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useFlowPayStore } from "@/hooks/use-flowpay-store";
 import { useLocale } from "@/hooks/use-locale";
+import { useUITheme, type UITheme } from "@/hooks/use-ui-theme";
 import { t } from "@/i18n/dictionary";
 import { createClient } from "@/services/supabase/browser";
 import type { TransactionTypePresetBaseType } from "@/types/domain";
@@ -26,6 +27,18 @@ function settingsCopy(locale: "th" | "en") {
     ? {
         summary: "หน้าสรุปยอด",
         importHistory: "หน้าอัปโหลดข้อมูลเก่า",
+        appearanceTitle: "ธีมหน้าตาแอป",
+        appearanceHint: "เลือกโทนและพื้นผิวของแอปได้ตามสไตล์ที่ชอบ โดยยังใช้ข้อมูลและฟังก์ชันเดิมทั้งหมด",
+        themeStandard: "standard",
+        themeNeumorphism: "neumorphism",
+        themeFlat: "flat",
+        themeGlass: "glass morphism",
+        themeColourful: "colourful",
+        themeStandardHint: "หน้าตาเดิมที่ใช้อยู่ตอนนี้",
+        themeNeumorphismHint: "พื้นผิวปุ่มและการ์ดนุ่มขึ้น ดูเหมือนนูนจากพื้น",
+        themeFlatHint: "เรียบ คม และลดเงาให้เหลือน้อยที่สุด",
+        themeGlassHint: "ใส โปร่ง และมีมิติแบบกระจก",
+        themeColourfulHint: "สดขึ้น มีสีสันและคอนทราสต์มากกว่าเดิม",
         summaryHint: "ตั้งงบรอบและกดเข้าไปดูรายละเอียด settlement ของแต่ละรอบได้จากหน้านี้",
         importHint: "ตรวจไฟล์ก่อนและนำเข้าข้อมูลย้อนหลังจาก Excel",
         typePresets: "ประเภทรายการ",
@@ -68,6 +81,18 @@ function settingsCopy(locale: "th" | "en") {
     : {
         summary: "Settlement page",
         importHistory: "Historical import page",
+        appearanceTitle: "App appearance",
+        appearanceHint: "Pick the visual style you want while keeping the same data and behavior across the app.",
+        themeStandard: "standard",
+        themeNeumorphism: "neumorphism",
+        themeFlat: "flat",
+        themeGlass: "glass morphism",
+        themeColourful: "colourful",
+        themeStandardHint: "The current default FlowPay look",
+        themeNeumorphismHint: "Soft raised surfaces with a gentler tactile feel",
+        themeFlatHint: "Cleaner, sharper surfaces with minimal shadows",
+        themeGlassHint: "Translucent panels with a frosted-glass feel",
+        themeColourfulHint: "A brighter look with more accent color throughout",
         summaryHint: "Set each cycle budget and open that cycle for detailed settlement",
         importHint: "Validate and import historical Excel data",
         typePresets: "Transaction type presets",
@@ -124,6 +149,7 @@ function isPasskeysDisabledError(error: unknown) {
 export default function SettingsPage() {
   const router = useRouter();
   const { locale } = useLocale();
+  const { uiTheme, setUITheme } = useUITheme();
   const copy = settingsCopy(locale);
   const passkeysUnavailableMessage =
     locale === "th" ? "โปรเจ็กต์นี้ยังไม่ได้เปิดใช้งาน Passkeys ในระบบหลังบ้าน" : "Passkeys are not enabled for this project yet.";
@@ -143,6 +169,14 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const themeOptions: Array<{ value: UITheme; label: string; hint: string }> = [
+    { value: "standard", label: copy.themeStandard, hint: copy.themeStandardHint },
+    { value: "neumorphism", label: copy.themeNeumorphism, hint: copy.themeNeumorphismHint },
+    { value: "flat", label: copy.themeFlat, hint: copy.themeFlatHint },
+    { value: "glass", label: copy.themeGlass, hint: copy.themeGlassHint },
+    { value: "colourful", label: copy.themeColourful, hint: copy.themeColourfulHint }
+  ];
 
   function resetPresetForm() {
     setLabel("");
@@ -308,6 +342,33 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-black">{t(locale, "settings")}</h1>
+
+      <Card>
+        <h2 className="text-xl font-bold">{copy.appearanceTitle}</h2>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.appearanceHint}</p>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {themeOptions.map((option) => {
+            const active = uiTheme === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setUITheme(option.value)}
+                className={[
+                  "rounded-2xl border px-4 py-4 text-left transition",
+                  active
+                    ? "border-teal-500 bg-teal-500/10 ring-2 ring-teal-500/20"
+                    : "border-slate-200 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
+                ].join(" ")}
+              >
+                <p className="font-semibold capitalize">{option.label}</p>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{option.hint}</p>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
 
       <Card>
         <div className="flex items-start gap-3">

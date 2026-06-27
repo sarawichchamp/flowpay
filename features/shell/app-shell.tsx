@@ -24,10 +24,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isPlainRoute = pathname.startsWith("/auth") || pathname.startsWith("/unlock");
 
   return (
-    <div className="min-h-screen bg-[#f6f8fb] text-slate-950 dark:bg-[#07111f] dark:text-white">
+    <div className="min-h-screen bg-[var(--app-bg)] text-[var(--app-fg)]">
       {!isPlainRoute ? (
         <div
-          className="fixed inset-x-0 top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-xl dark:border-white/10 dark:bg-[#07111f]/80"
+          className="fixed inset-x-0 top-0 z-20 border-b border-[var(--header-border)] bg-[var(--header-bg)] backdrop-blur-xl"
           style={{
             paddingTop: "env(safe-area-inset-top)",
             paddingLeft: "env(safe-area-inset-left)",
@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-2 px-3 py-2 sm:px-4">
             <Link href="/" className="flex items-center gap-3 font-bold">
-              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-slate-950 text-teal-300 dark:bg-white">FP</span>
+              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)] shadow-[var(--secondary-shadow)]">FP</span>
               <span className="hidden min-[390px]:inline">FlowPay</span>
             </Link>
             <div className="hidden items-center gap-1 md:flex">
@@ -48,8 +48,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10",
-                      active && "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
+                      "flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition",
+                      "text-[var(--app-fg)] shadow-[var(--secondary-shadow)] hover:bg-[var(--ghost-hover)]",
+                      active && "bg-[var(--nav-active-bg)] text-[var(--nav-active-fg)] shadow-[var(--pressed-shadow)]"
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -73,7 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-label={t(locale, "settings")}
                 href="/settings"
                 title={t(locale, "settings")}
-                className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/70 text-slate-950 ring-1 ring-slate-200 transition hover:bg-white dark:bg-white/10 dark:text-white dark:ring-white/10"
+                className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-muted)] text-[var(--app-fg)] ring-1 ring-[var(--control-border)] shadow-[var(--secondary-shadow)] transition hover:bg-[var(--control-hover)]"
               >
                 <Settings className="h-5 w-5" />
               </Link>
@@ -111,7 +112,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {!isPlainRoute ? (
         <nav
-          className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-2 pt-2 backdrop-blur-xl dark:border-white/10 dark:bg-[#07111f]/95 md:hidden"
+          className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--header-border)] bg-[var(--header-bg)] px-2 pt-2 backdrop-blur-xl md:hidden"
           style={{
             paddingBottom: "env(safe-area-inset-bottom)",
             paddingLeft: "env(safe-area-inset-left)",
@@ -127,8 +128,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-[11px] font-semibold text-slate-500",
-                    active && "bg-teal-50 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300"
+                    "flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-[11px] font-semibold",
+                    "text-[var(--app-fg)] shadow-[var(--secondary-shadow)]",
+                    active && "bg-[var(--accent-soft)] text-[var(--accent-fg)] shadow-[var(--pressed-shadow)]"
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -139,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link
               aria-label={t(locale, "addTransaction")}
               href="/transactions?new=true"
-              className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-teal-500 text-[11px] font-semibold text-slate-950 shadow-lg shadow-teal-500/20"
+              className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-[var(--primary-bg)] text-[11px] font-semibold text-[var(--primary-fg)] shadow-lg shadow-[var(--primary-shadow)]"
             >
               <Plus className="h-5 w-5" />
               {t(locale, "addTransaction")}

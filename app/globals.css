@@ -6,12 +6,251 @@
   color-scheme: light;
   --background: #f6f8fb;
   --foreground: #0f172a;
+  --app-bg: #f6f8fb;
+  --app-fg: #0f172a;
+  --surface: rgba(255, 255, 255, 0.85);
+  --surface-strong: #ffffff;
+  --surface-soft: #f8fafc;
+  --surface-muted: rgba(255, 255, 255, 0.7);
+  --border: rgba(226, 232, 240, 0.8);
+  --header-bg: rgba(255, 255, 255, 0.8);
+  --header-border: rgba(226, 232, 240, 0.7);
+  --control-bg: #ffffff;
+  --control-border: #e2e8f0;
+  --control-hover: #ffffff;
+  --ghost-hover: #f1f5f9;
+  --badge-bg: #f1f5f9;
+  --badge-fg: #475569;
+  --primary-bg: #14b8a6;
+  --primary-fg: #0f172a;
+  --primary-hover: #2dd4bf;
+  --primary-shadow: rgba(20, 184, 166, 0.2);
+  --nav-active-bg: #0f172a;
+  --nav-active-fg: #ffffff;
+  --accent-soft: rgba(20, 184, 166, 0.12);
+  --accent-fg: #0f766e;
+  --panel-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  --control-shadow: none;
+  --secondary-shadow: none;
+  --pressed-shadow: none;
+  --surface-blur: blur(10px);
 }
 
 .dark {
   color-scheme: dark;
   --background: #07111f;
   --foreground: #ffffff;
+  --app-bg: #07111f;
+  --app-fg: #ffffff;
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-strong: rgba(255, 255, 255, 0.1);
+  --surface-soft: rgba(255, 255, 255, 0.05);
+  --surface-muted: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.1);
+  --header-bg: rgba(7, 17, 31, 0.82);
+  --header-border: rgba(255, 255, 255, 0.1);
+  --control-bg: rgba(255, 255, 255, 0.1);
+  --control-border: rgba(255, 255, 255, 0.1);
+  --control-hover: rgba(255, 255, 255, 0.15);
+  --ghost-hover: rgba(255, 255, 255, 0.1);
+  --badge-bg: rgba(255, 255, 255, 0.1);
+  --badge-fg: #e2e8f0;
+  --primary-bg: #14b8a6;
+  --primary-fg: #0f172a;
+  --primary-hover: #2dd4bf;
+  --primary-shadow: rgba(20, 184, 166, 0.24);
+  --nav-active-bg: #ffffff;
+  --nav-active-fg: #0f172a;
+  --accent-soft: rgba(45, 212, 191, 0.12);
+  --accent-fg: #5eead4;
+  --panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+  --control-shadow: none;
+  --secondary-shadow: none;
+  --pressed-shadow: none;
+  --surface-blur: blur(10px);
+}
+
+:root[data-ui-theme="neumorphism"] {
+  --app-bg: #ecf0f3;
+  --app-fg: #5d6678;
+  --surface: #ecf0f3;
+  --surface-strong: #f5f7fa;
+  --surface-soft: #dde4ec;
+  --surface-muted: #ecf0f3;
+  --border: transparent;
+  --header-bg: rgba(236, 240, 243, 0.96);
+  --header-border: transparent;
+  --control-bg: #ecf0f3;
+  --control-border: transparent;
+  --control-hover: #eef2f5;
+  --ghost-hover: #e3e9f1;
+  --badge-bg: #ecf0f3;
+  --badge-fg: #8b95a7;
+  --primary-bg: #ecf0f3;
+  --primary-fg: #6b7486;
+  --primary-hover: #eef2f5;
+  --primary-shadow: rgba(207, 216, 227, 1);
+  --nav-active-bg: #ecf0f3;
+  --nav-active-fg: #4b5565;
+  --accent-soft: #ecf0f3;
+  --accent-fg: #5d6678;
+  --panel-shadow: 18px 18px 36px #d1d9e6, -18px -18px 36px #ffffff;
+  --control-shadow: inset 18px 18px 30px #d1d9e6, inset -18px -18px 30px #ffffff;
+  --secondary-shadow: 12px 12px 24px #d1d9e6, -12px -12px 24px #ffffff;
+  --pressed-shadow: inset 12px 12px 24px #d1d9e6, inset -12px -12px 24px #ffffff;
+  --surface-blur: blur(0px);
+}
+
+.dark[data-ui-theme="neumorphism"] {
+  --app-bg: #1a2230;
+  --app-fg: #c9d2df;
+  --surface: #1a2230;
+  --surface-strong: #212b3b;
+  --surface-soft: #151d29;
+  --surface-muted: #1a2230;
+  --border: transparent;
+  --header-bg: rgba(26, 34, 48, 0.96);
+  --header-border: transparent;
+  --control-bg: #1a2230;
+  --control-border: transparent;
+  --control-hover: #1d2736;
+  --ghost-hover: #1f2938;
+  --badge-bg: #1a2230;
+  --badge-fg: #93a0b4;
+  --primary-bg: #1a2230;
+  --primary-fg: #d5deea;
+  --primary-hover: #1e2938;
+  --nav-active-bg: #1a2230;
+  --nav-active-fg: #f8fafc;
+  --accent-soft: #1a2230;
+  --accent-fg: #d5deea;
+  --panel-shadow: 18px 18px 36px #111722, -18px -18px 36px #232d3e;
+  --control-shadow: inset 16px 16px 28px #111722, inset -16px -16px 28px #232d3e;
+  --secondary-shadow: 10px 10px 22px #111722, -10px -10px 22px #232d3e;
+  --pressed-shadow: inset 10px 10px 22px #111722, inset -10px -10px 22px #232d3e;
+  --surface-blur: blur(0px);
+}
+
+:root[data-ui-theme="flat"] {
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --surface-soft: #f8fafc;
+  --surface-muted: #ffffff;
+  --border: #cbd5e1;
+  --header-bg: rgba(255, 255, 255, 0.96);
+  --header-border: #cbd5e1;
+  --control-bg: #ffffff;
+  --control-border: #cbd5e1;
+  --control-hover: #f8fafc;
+  --ghost-hover: #e2e8f0;
+  --badge-bg: #e2e8f0;
+  --badge-fg: #334155;
+  --panel-shadow: none;
+}
+
+.dark[data-ui-theme="flat"] {
+  --surface: #0f172a;
+  --surface-strong: #111c31;
+  --surface-soft: #152238;
+  --surface-muted: #152238;
+  --border: #334155;
+  --header-bg: rgba(15, 23, 42, 0.96);
+  --header-border: #334155;
+  --control-bg: #152238;
+  --control-border: #334155;
+  --control-hover: #1e293b;
+  --ghost-hover: #1e293b;
+  --badge-bg: #1e293b;
+  --badge-fg: #e2e8f0;
+  --panel-shadow: none;
+}
+
+:root[data-ui-theme="glass"] {
+  --app-bg: linear-gradient(180deg, #eaf6fb 0%, #f5efff 100%);
+  --surface: rgba(255, 255, 255, 0.38);
+  --surface-strong: rgba(255, 255, 255, 0.55);
+  --surface-soft: rgba(255, 255, 255, 0.3);
+  --surface-muted: rgba(255, 255, 255, 0.28);
+  --border: rgba(255, 255, 255, 0.5);
+  --header-bg: rgba(255, 255, 255, 0.38);
+  --header-border: rgba(255, 255, 255, 0.45);
+  --control-bg: rgba(255, 255, 255, 0.4);
+  --control-border: rgba(255, 255, 255, 0.5);
+  --control-hover: rgba(255, 255, 255, 0.56);
+  --ghost-hover: rgba(255, 255, 255, 0.44);
+  --badge-bg: rgba(255, 255, 255, 0.42);
+  --badge-fg: #334155;
+  --panel-shadow: 0 18px 40px rgba(45, 212, 191, 0.12);
+}
+
+.dark[data-ui-theme="glass"] {
+  --app-bg: radial-gradient(circle at top left, rgba(45, 212, 191, 0.12), transparent 28%), linear-gradient(180deg, #07111f 0%, #10213a 100%);
+  --surface: rgba(255, 255, 255, 0.08);
+  --surface-strong: rgba(255, 255, 255, 0.12);
+  --surface-soft: rgba(255, 255, 255, 0.06);
+  --surface-muted: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.14);
+  --header-bg: rgba(7, 17, 31, 0.45);
+  --header-border: rgba(255, 255, 255, 0.14);
+  --control-bg: rgba(255, 255, 255, 0.1);
+  --control-border: rgba(255, 255, 255, 0.15);
+  --control-hover: rgba(255, 255, 255, 0.16);
+  --ghost-hover: rgba(255, 255, 255, 0.12);
+  --badge-bg: rgba(255, 255, 255, 0.12);
+  --badge-fg: #e2e8f0;
+  --panel-shadow: 0 22px 48px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-ui-theme="colourful"] {
+  --app-bg: linear-gradient(180deg, #fff6ea 0%, #eef7ff 50%, #f9f0ff 100%);
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-strong: #ffffff;
+  --surface-soft: rgba(255, 244, 230, 0.75);
+  --surface-muted: rgba(255, 255, 255, 0.72);
+  --border: rgba(251, 191, 36, 0.28);
+  --header-bg: rgba(255, 255, 255, 0.82);
+  --header-border: rgba(251, 191, 36, 0.24);
+  --control-bg: rgba(255, 255, 255, 0.92);
+  --control-border: rgba(251, 191, 36, 0.25);
+  --control-hover: #fff8ef;
+  --ghost-hover: #fff2de;
+  --badge-bg: #ffe7c2;
+  --badge-fg: #9a3412;
+  --primary-bg: #fb7185;
+  --primary-fg: #fff7ed;
+  --primary-hover: #f43f5e;
+  --primary-shadow: rgba(244, 63, 94, 0.22);
+  --nav-active-bg: #0f172a;
+  --nav-active-fg: #fff7ed;
+  --accent-soft: rgba(251, 113, 133, 0.12);
+  --accent-fg: #e11d48;
+  --panel-shadow: 0 14px 34px rgba(251, 113, 133, 0.14);
+}
+
+.dark[data-ui-theme="colourful"] {
+  --app-bg: radial-gradient(circle at top left, rgba(251, 113, 133, 0.14), transparent 24%), linear-gradient(180deg, #15111f 0%, #1e1a33 100%);
+  --surface: rgba(36, 25, 53, 0.78);
+  --surface-strong: rgba(56, 39, 79, 0.82);
+  --surface-soft: rgba(52, 34, 75, 0.7);
+  --surface-muted: rgba(56, 39, 79, 0.66);
+  --border: rgba(251, 113, 133, 0.18);
+  --header-bg: rgba(21, 17, 31, 0.82);
+  --header-border: rgba(251, 113, 133, 0.14);
+  --control-bg: rgba(60, 41, 85, 0.72);
+  --control-border: rgba(251, 113, 133, 0.2);
+  --control-hover: rgba(72, 48, 103, 0.78);
+  --ghost-hover: rgba(72, 48, 103, 0.6);
+  --badge-bg: rgba(251, 113, 133, 0.18);
+  --badge-fg: #ffd7df;
+  --primary-bg: #fb7185;
+  --primary-fg: #fff7ed;
+  --primary-hover: #f43f5e;
+  --primary-shadow: rgba(244, 63, 94, 0.3);
+  --nav-active-bg: #fef3c7;
+  --nav-active-fg: #3f1d2e;
+  --accent-soft: rgba(251, 113, 133, 0.16);
+  --accent-fg: #fda4af;
+  --panel-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
 }
 
 * {
@@ -26,9 +265,10 @@ html {
 body {
   min-height: 100%;
   margin: 0;
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--app-bg);
+  color: var(--app-fg);
   font-family: var(--font-kanit), sans-serif;
+  transition: background 220ms ease, color 220ms ease;
 }
 
 #__next,
