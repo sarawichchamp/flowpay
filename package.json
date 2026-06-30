@@ -7,7 +7,11 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "qa:settlement": "node scripts/settlement-rule-check.mjs",
+    "test:settlement": "node --test tests/settlement-rules.test.mjs",
+    "qa:business-rules": "node scripts/business-rule-check.mjs",
+    "test:business-rules": "node --test tests/business-rules.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "latest",

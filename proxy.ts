@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getAppMode, isSupabaseDemoMode } from "@/services/flowpay/app-mode";
 import { isAuthenticatedHouseholdMember } from "@/services/flowpay/auth";
 import { updateSession } from "@/services/supabase/proxy";
+import { getSafeInternalPath } from "@/utils/navigation";
 
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);
@@ -28,7 +29,7 @@ export async function proxy(request: NextRequest) {
 
     if (hasSupabaseSession) {
       const userId = user?.id;
-      const nextPath = request.nextUrl.searchParams.get("next") ?? "/";
+      const nextPath = getSafeInternalPath(request.nextUrl.searchParams.get("next"));
 
       if (userId) {
         const isMember = await isAuthenticatedHouseholdMember(userId, user?.email).catch(() => false);
@@ -42,7 +43,7 @@ export async function proxy(request: NextRequest) {
       }
       if (!requiresReauth && (isUnlockRoute || pathname === "/auth/login")) {
         const homeUrl = request.nextUrl.clone();
-        homeUrl.pathname = nextPath.startsWith("/") ? nextPath : "/";
+        homeUrl.pathname = nextPath;
         homeUrl.search = "";
         return NextResponse.redirect(homeUrl);
       }

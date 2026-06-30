@@ -9,6 +9,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
 import { createClient } from "@/services/supabase/browser";
+import { getSafeInternalPath } from "@/utils/navigation";
 
 function loginCopy(locale: "th" | "en") {
   return locale === "th"
@@ -63,8 +64,7 @@ export default function LoginPage() {
   const [passwordLoading, setPasswordLoading] = useState(false);
 
   const nextPath = useMemo(() => {
-    const next = searchParams.get("next");
-    return next && next.startsWith("/") ? next : "/";
+    return getSafeInternalPath(searchParams.get("next"));
   }, [searchParams]);
 
   async function handlePasswordSignIn(event: FormEvent<HTMLFormElement>) {

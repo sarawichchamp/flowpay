@@ -1,15 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Kanit } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { AppShell } from "@/features/shell/app-shell";
 import { getFlowPayBootstrap } from "@/services/flowpay/bootstrap";
-
-const kanit = Kanit({
-  variable: "--font-kanit",
-  subsets: ["latin", "thai"],
-  weight: ["300", "400", "500", "600", "700"]
-});
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +40,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   return (
     <html lang="th" suppressHydrationWarning>
-      <body className={kanit.variable}>
+      <body>
         <Providers initialData={initialData}>
           <AppShell>{children}</AppShell>
         </Providers>

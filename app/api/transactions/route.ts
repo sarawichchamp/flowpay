@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import type { z } from "zod";
 import { findCategoryIdByAlias } from "@/repositories/category-helpers";
 import { requireHouseholdApiAccess } from "@/services/flowpay/api-access";
+import { ensureBillingCycleExists, getHouseholdProfileIds } from "@/services/flowpay/request-validation";
 import { createAdminClient } from "@/services/supabase/admin";
 import type { Transaction } from "@/types/domain";
+import { deleteByIdSchema, transactionBatchSchema, transactionSchema, transactionUpdateSchema } from "@/utils/validation";
 
 function mapTransaction(data: {
   id: string;
@@ -36,6 +39,45 @@ function mapTransaction(data: {
   };
 }
 
+type TransactionWriteInput = z.infer<typeof transactionSchema>;
+
+async function validateTransactionReferences(
+  supabase: ReturnType<typeof createAdminClient>,
+  input: TransactionWriteInput,
+  householdProfileIds: Set<string>,
+  knownCycleIds: Map<string, boolean>
+) {
+  if (!householdProfileIds.has(input.payerUserId)) {
+    return NextResponse.json({ error: "Invalid payer" }, { status: 400 });
+  }
+
+  if (!knownCycleIds.has(input.billingCycleId)) {
+    knownCycleIds.set(input.billingCycleId, await ensureBillingCycleExists(supabase, input.billingCycleId));
+  }
+
+  if (!knownCycleIds.get(input.billingCycleId)) {
+    return NextResponse.json({ error: "Invalid billing cycle" }, { status: 400 });
+  }
+
+  const resolvedCategoryId = await findCategoryIdByAlias(supabase, input.categoryId);
+  if (!resolvedCategoryId) {
+    return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+  }
+
+  if (input.transactionType === "food") {
+    const foodCategoryId = await findCategoryIdByAlias(supabase, "food");
+    if (!foodCategoryId || resolvedCategoryId !== foodCategoryId) {
+      return NextResponse.json({ error: "Food transactions must use the food category" }, { status: 400 });
+    }
+
+    if (input.splitType !== "no_split") {
+      return NextResponse.json({ error: "Food transactions must use no_split" }, { status: 400 });
+    }
+  }
+
+  return { resolvedCategoryId };
+}
+
 export async function POST(request: Request) {
   const unauthorized = await requireHouseholdApiAccess();
   if (unauthorized) {
@@ -43,36 +85,32 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const body = (await request.json()) as {
-    billingCycleId: string;
-    date: string;
-    title: string;
-    categoryId: string;
-    amount: number;
-    payerUserId: string;
-    transactionType: "food" | "normal" | "installment";
-    splitType: "split_half" | "no_split" | "full_reimburse";
-    note?: string | null;
-    attachmentUrl?: string | null;
-    transactions?: Array<{
-      billingCycleId: string;
-      date: string;
-      title: string;
-      categoryId: string;
-      amount: number;
-      payerUserId: string;
-      transactionType: "food" | "normal" | "installment";
-      splitType: "split_half" | "no_split" | "full_reimburse";
-      note?: string | null;
-      attachmentUrl?: string | null;
-    }>;
-  };
+  let rawBody: unknown;
 
-  const inputs = body.transactions?.length ? body.transactions : [body];
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const parsed = rawBody && typeof rawBody === "object" && "transactions" in rawBody
+    ? transactionBatchSchema.safeParse(rawBody)
+    : transactionSchema.safeParse(rawBody);
+
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid transaction payload" }, { status: 400 });
+  }
+
+  const inputs = "transactions" in parsed.data ? parsed.data.transactions : [parsed.data];
   const createdTransactions: Transaction[] = [];
+  const householdProfileIds = await getHouseholdProfileIds(supabase);
+  const knownCycleIds = new Map<string, boolean>();
 
   for (const input of inputs) {
-    const resolvedCategoryId = await findCategoryIdByAlias(supabase, input.categoryId);
+    const validation = await validateTransactionReferences(supabase, input, householdProfileIds, knownCycleIds);
+    if (validation instanceof NextResponse) {
+      return validation;
+    }
 
     const { data, error } = await supabase
       .from("transactions")
@@ -80,7 +118,7 @@ export async function POST(request: Request) {
         billing_cycle_id: input.billingCycleId,
         date: input.date,
         title: input.title,
-        category_id: resolvedCategoryId,
+        category_id: validation.resolvedCategoryId,
         amount: input.amount,
         payer_user_id: input.payerUserId,
         transaction_type: input.transactionType,
@@ -99,7 +137,7 @@ export async function POST(request: Request) {
     createdTransactions.push(mapTransaction(data));
   }
 
-  if (body.transactions?.length) {
+  if ("transactions" in parsed.data) {
     return NextResponse.json({ transactions: createdTransactions });
   }
 
@@ -113,19 +151,20 @@ export async function PUT(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const body = (await request.json()) as {
-    id: string;
-    billingCycleId: string;
-    date: string;
-    title: string;
-    categoryId: string;
-    amount: number;
-    payerUserId: string;
-    transactionType: "food" | "normal" | "installment";
-    splitType: "split_half" | "no_split" | "full_reimburse";
-    note?: string | null;
-    attachmentUrl?: string | null;
-  };
+  let rawBody: unknown;
+
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const parsed = transactionUpdateSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid transaction payload" }, { status: 400 });
+  }
+
+  const body = parsed.data;
 
   const { data: existing, error: existingError } = await supabase
     .from("transactions")
@@ -141,7 +180,11 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Installment transactions must be edited from installments" }, { status: 400 });
   }
 
-  const resolvedCategoryId = await findCategoryIdByAlias(supabase, body.categoryId);
+  const householdProfileIds = await getHouseholdProfileIds(supabase);
+  const validation = await validateTransactionReferences(supabase, body, householdProfileIds, new Map());
+  if (validation instanceof NextResponse) {
+    return validation;
+  }
 
   const { data, error } = await supabase
     .from("transactions")
@@ -149,7 +192,7 @@ export async function PUT(request: Request) {
       billing_cycle_id: body.billingCycleId,
       date: body.date,
       title: body.title,
-      category_id: resolvedCategoryId,
+      category_id: validation.resolvedCategoryId,
       amount: body.amount,
       payer_user_id: body.payerUserId,
       transaction_type: body.transactionType,
@@ -175,7 +218,20 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const body = (await request.json()) as { id: string };
+  let rawBody: unknown;
+
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const parsed = deleteByIdSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid transaction id" }, { status: 400 });
+  }
+
+  const body = parsed.data;
 
   const { data: existing, error: existingError } = await supabase
     .from("transactions")

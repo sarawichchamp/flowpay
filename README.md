@@ -48,6 +48,10 @@ npm run dev
 npm run build
 npm run lint
 npm run typecheck
+npm run qa:settlement
+npm run test:settlement
+npm run qa:business-rules
+npm run test:business-rules
 ```
 
 If Windows blocks optional postinstall scripts, use:
@@ -55,3 +59,8 @@ If Windows blocks optional postinstall scripts, use:
 ```bash
 npm install --ignore-scripts
 ```
+
+## QA Notes
+
+- Settlement business rules: [docs/SETTLEMENT_RULES.md](/Users/lilymootoo/Documents/Codex project/Flowpay/flowpay/docs/SETTLEMENT_RULES.md)
+- QA status and follow-up checklist: [docs/QA_CHECKLIST.md](/Users/lilymootoo/Documents/Codex project/Flowpay/flowpay/docs/QA_CHECKLIST.md)

@@ -14,6 +14,47 @@ type ValidationIssue = {
   message: string;
 };
 
+type ImportPreview = {
+  billingCycles: Array<{
+    startDate: string;
+    endDate: string;
+    foodBudgetTarget: number;
+    foodWalletHolderUserId: string;
+    carryOverAmount: number;
+  }>;
+  installments: Array<{
+    title: string;
+    totalInstallments: number;
+    currentInstallment: number;
+    monthlyAmount: number;
+    startDate: string;
+    endDate: string;
+    payerUserId: string;
+    splitType: "split_half" | "no_split" | "full_reimburse";
+  }>;
+  transactions: Array<{
+    cycleStartDate: string;
+    date: string;
+    title: string;
+    categoryId: string;
+    amount: number;
+    payerUserId: string;
+    transactionType: "food" | "normal" | "installment";
+    splitType: "split_half" | "no_split" | "full_reimburse";
+    note: string | null;
+    installmentTitle: string | null;
+    installmentNumber: number | null;
+  }>;
+  summary: {
+    importedCycles: number;
+    skippedCycles: number;
+    importedInstallments: number;
+    skippedInstallments: number;
+    importedTransactions: number;
+    skippedTransactions: number;
+  };
+};
+
 function importCopy(locale: "th" | "en") {
   return locale === "th"
     ? {
@@ -21,25 +62,47 @@ function importCopy(locale: "th" | "en") {
         subtitle: "ระบบจะตรวจไฟล์ก่อนเสมอ ถ้ามีแถวผิดจะหยุดและแจ้งรายการที่ต้องแก้ก่อนเขียนข้อมูลจริง",
         template: "ดาวน์โหลด Excel template",
         file: "ไฟล์ Excel",
-        upload: "ตรวจและอัปโหลดข้อมูล",
+        upload: "ดูตัวอย่างก่อนนำเข้า",
         uploading: "กำลังตรวจไฟล์...",
+        confirmImport: "ยืนยันการนำเข้า",
+        confirming: "กำลังนำเข้าจริง...",
         result: "ผลการนำเข้า",
+        preview: "ตัวอย่างก่อนนำเข้า",
         helper: "ใช้ไฟล์ .xlsx ที่มีชีต BillingCycles, Transactions และ Installments",
         importFailed: "นำเข้าข้อมูลไม่สำเร็จ",
-        validationTitle: "รายการที่ต้องแก้ก่อนนำเข้า"
+        validationTitle: "รายการที่ต้องแก้ก่อนนำเข้า",
+        previewReady: "ตรวจไฟล์ผ่านแล้ว กรุณาตรวจจำนวนรายการก่อนยืนยันนำเข้าจริง"
       }
     : {
         title: "Import historical data",
         subtitle: "The file is validated first. If any row is invalid, import stops and shows the errors before writing data.",
         template: "Download Excel template",
         file: "Excel file",
-        upload: "Validate and upload",
+        upload: "Preview import",
         uploading: "Validating...",
+        confirmImport: "Confirm import",
+        confirming: "Importing...",
         result: "Import result",
+        preview: "Preview",
         helper: "Use a .xlsx file with BillingCycles, Transactions, and Installments sheets.",
         importFailed: "Import failed",
-        validationTitle: "Fix these rows before importing"
+        validationTitle: "Fix these rows before importing",
+        previewReady: "Validation passed. Review the counts below before confirming the actual import."
       };
+}
+
+function isImportSummary(value: unknown): value is ImportPreview["summary"] {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<ImportPreview["summary"]>;
+
+  return (
+    typeof candidate.importedCycles === "number" &&
+    typeof candidate.skippedCycles === "number" &&
+    typeof candidate.importedInstallments === "number" &&
+    typeof candidate.skippedInstallments === "number" &&
+    typeof candidate.importedTransactions === "number" &&
+    typeof candidate.skippedTransactions === "number"
+  );
 }
 
 export default function ImportHistoryPage() {
@@ -47,16 +110,27 @@ export default function ImportHistoryPage() {
   const copy = importCopy(locale);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<string>("");
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
 
-  async function handleUpload() {
+  function formatSummary(summary: ImportPreview["summary"]) {
+    const skippedTotal = summary.skippedCycles + summary.skippedInstallments + summary.skippedTransactions;
+
+    return locale === "th"
+      ? `รอบบิล ${summary.importedCycles} / ผ่อนชำระ ${summary.importedInstallments} / ธุรกรรม ${summary.importedTransactions} / ข้ามซ้ำ ${skippedTotal}`
+      : `Cycles ${summary.importedCycles} / Installments ${summary.importedInstallments} / Transactions ${summary.importedTransactions} / Skipped ${skippedTotal}`;
+  }
+
+  async function handlePreview() {
     if (!file) return;
     setLoading(true);
     setError("");
     setResult("");
     setValidationErrors([]);
+    setPreview(null);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -67,6 +141,7 @@ export default function ImportHistoryPage() {
     });
 
     const payload = (await response.json()) as {
+      preview?: ImportPreview;
       importedCycles?: number;
       skippedCycles?: number;
       importedInstallments?: number;
@@ -85,14 +160,48 @@ export default function ImportHistoryPage() {
       return;
     }
 
-    const skippedTotal =
-      (payload.skippedCycles ?? 0) + (payload.skippedInstallments ?? 0) + (payload.skippedTransactions ?? 0);
+    if (payload.preview) {
+      setPreview(payload.preview);
+      setResult(formatSummary(payload.preview.summary));
+    }
+  }
 
-    setResult(
-      locale === "th"
-        ? `รอบบิล ${payload.importedCycles ?? 0} / ผ่อนชำระ ${payload.importedInstallments ?? 0} / ธุรกรรม ${payload.importedTransactions ?? 0} / ข้ามซ้ำ ${skippedTotal}`
-        : `Cycles ${payload.importedCycles ?? 0} / Installments ${payload.importedInstallments ?? 0} / Transactions ${payload.importedTransactions ?? 0} / Skipped ${skippedTotal}`
-    );
+  async function handleConfirmImport() {
+    if (!preview) return;
+
+    setConfirming(true);
+    setError("");
+
+    const response = await fetch("/api/import-history", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        mode: "commit",
+        preview
+      })
+    });
+
+    const payload = (await response.json()) as unknown;
+
+    setConfirming(false);
+
+    if (!response.ok) {
+      const message = payload && typeof payload === "object" && "error" in payload ? (payload as { error?: string }).error : null;
+      setError(message ?? copy.importFailed);
+      return;
+    }
+
+    if (!isImportSummary(payload)) {
+      setError(copy.importFailed);
+      return;
+    }
+
+    const summary = payload;
+    setResult(formatSummary(summary));
+    setPreview(null);
+    setFile(null);
   }
 
   return (
@@ -129,19 +238,37 @@ export default function ImportHistoryPage() {
             type="file"
             accept=".xlsx"
             className="block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-white/10"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null);
+              setPreview(null);
+              setResult("");
+              setError("");
+              setValidationErrors([]);
+            }}
           />
         </Field>
-        <div className="mt-5">
-          <Button type="button" onClick={() => void handleUpload()} disabled={!file || loading}>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button type="button" onClick={() => void handlePreview()} disabled={!file || loading || confirming}>
             <Upload className="h-4 w-4" />
             {loading ? copy.uploading : copy.upload}
           </Button>
+          {preview ? (
+            <Button type="button" variant="secondary" onClick={() => void handleConfirmImport()} disabled={loading || confirming}>
+              <Upload className="h-4 w-4" />
+              {confirming ? copy.confirming : copy.confirmImport}
+            </Button>
+          ) : null}
         </div>
         {result ? (
           <p className="mt-4 text-sm text-teal-600 dark:text-teal-300">
             {copy.result}: {result}
           </p>
+        ) : null}
+        {preview ? (
+          <div className="mt-5 rounded-2xl border border-teal-200 bg-teal-50 p-4 dark:border-teal-500/20 dark:bg-teal-500/10">
+            <p className="text-sm font-semibold text-teal-700 dark:text-teal-200">{copy.preview}</p>
+            <p className="mt-2 text-sm text-teal-700 dark:text-teal-200">{copy.previewReady}</p>
+          </div>
         ) : null}
         {error ? <p className="mt-4 text-sm text-red-500">{error}</p> : null}
         {validationErrors.length ? (

@@ -24,6 +24,7 @@ Open `http://localhost:3000`.
 3. Configure Google OAuth redirect URLs.
 4. Turn on Realtime for `notifications`.
 5. Ensure built-in category rows exist from `supabase/schema.sql` before creating transactions.
+6. Follow [docs/SQL_DEPLOY_CHECKLIST.md](/Users/lilymootoo/Documents/Codex project/Flowpay/flowpay/docs/SQL_DEPLOY_CHECKLIST.md) before applying schema changes to staging/production.
 
 ## Production Checklist
 

@@ -5,9 +5,11 @@ import { requireHouseholdApiAccess } from "@/services/flowpay/api-access";
 import { defaultFoodBudgetTarget, householdPayrollDay } from "@/services/flowpay/config";
 import { ensureInstallmentTransactionsForCycle } from "@/services/installments/ensure-cycle-installment-transactions";
 import { calculateMonthlySettlement } from "@/services/settlement/calculate-monthly-settlement";
+import { parseJsonWithSchema } from "@/services/flowpay/request-validation";
 import { createAdminClient } from "@/services/supabase/admin";
 import { getBillingCycleFromPayrollDate } from "@/utils/billing-cycle";
 import type { BillingCycle } from "@/types/domain";
+import { billingCycleCreateSchema, billingCycleUpdateSchema } from "@/utils/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -43,10 +45,10 @@ export async function POST(request: Request) {
   const repository = new FlowPayRepository(supabase);
 
   try {
-    const body = (await request.json()) as {
-      foodBudgetTarget?: number;
-      foodWalletHolderUserId?: string;
-    };
+    const { data: body, error: parseError } = await parseJsonWithSchema(request, billingCycleCreateSchema);
+    if (parseError || !body) {
+      return parseError;
+    }
 
     const [currentCycle, profiles, installments] = await Promise.all([
       repository.getCurrentBillingCycle(),
@@ -135,13 +137,9 @@ export async function PUT(request: Request) {
   const supabase = createAdminClient();
 
   try {
-    const body = (await request.json()) as {
-      id: string;
-      foodBudgetTarget?: number;
-    };
-
-    if (!body.id) {
-      return NextResponse.json({ error: "Billing cycle id is required" }, { status: 400 });
+    const { data: body, error: parseError } = await parseJsonWithSchema(request, billingCycleUpdateSchema);
+    if (parseError || !body) {
+      return parseError;
     }
 
     const nextBudgetTarget = body.foodBudgetTarget ?? defaultFoodBudgetTarget;

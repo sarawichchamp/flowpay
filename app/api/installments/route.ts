@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { findCategoryIdByAlias } from "@/repositories/category-helpers";
 import { FlowPayRepository } from "@/repositories/flowpay-repository";
 import { requireHouseholdApiAccess } from "@/services/flowpay/api-access";
+import { ensureBillingCycleExists, getHouseholdProfileIds, parseJsonWithSchema } from "@/services/flowpay/request-validation";
 import { generateInstallmentTransactions } from "@/services/installments/generate-installment-transactions";
 import { createAdminClient } from "@/services/supabase/admin";
+import { isMissingRpcFunction } from "@/services/supabase/rpc";
 import type { Database } from "@/types/database";
 import type { Installment, Transaction } from "@/types/domain";
+import { deleteByIdSchema, installmentSchema } from "@/utils/validation";
 
 function mapInstallment(row: Database["public"]["Tables"]["installments"]["Row"]): Installment {
   return {
@@ -53,6 +56,23 @@ type InstallmentRequestBody = {
   splitType: "split_half" | "no_split" | "full_reimburse";
 };
 
+async function validateInstallmentRequest(
+  supabase: ReturnType<typeof createAdminClient>,
+  body: InstallmentRequestBody
+) {
+  const householdProfileIds = await getHouseholdProfileIds(supabase);
+  if (!householdProfileIds.has(body.payerUserId)) {
+    return NextResponse.json({ error: "Invalid payer" }, { status: 400 });
+  }
+
+  const hasBillingCycle = await ensureBillingCycleExists(supabase, body.billingCycleId);
+  if (!hasBillingCycle) {
+    return NextResponse.json({ error: "Invalid billing cycle" }, { status: 400 });
+  }
+
+  return null;
+}
+
 async function buildInstallmentSchedule(
   body: InstallmentRequestBody,
   installmentId: string,
@@ -75,6 +95,35 @@ async function buildInstallmentSchedule(
   });
 
   return generateInstallmentTransactions(installment, cycles, categoryId);
+}
+
+async function loadInstallmentResponse(
+  supabase: ReturnType<typeof createAdminClient>,
+  installmentId: string,
+  billingCycleId: string
+) {
+  const [{ data: installmentRow, error: installmentError }, { data: currentCycleTransactionRow, error: transactionError }] = await Promise.all([
+    supabase.from("installments").select("*").eq("id", installmentId).single(),
+    supabase
+      .from("transactions")
+      .select("*")
+      .eq("installment_id", installmentId)
+      .eq("billing_cycle_id", billingCycleId)
+      .maybeSingle()
+  ]);
+
+  if (installmentError) {
+    throw new Error(installmentError.message);
+  }
+
+  if (transactionError) {
+    throw new Error(transactionError.message);
+  }
+
+  return {
+    installment: mapInstallment(installmentRow),
+    currentCycleTransaction: currentCycleTransactionRow ? mapTransaction(currentCycleTransactionRow) : null
+  };
 }
 
 async function syncInstallmentTransactions(
@@ -258,7 +307,35 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const body = (await request.json()) as InstallmentRequestBody;
+  const { data: body, error } = await parseJsonWithSchema(request, installmentSchema);
+  if (error || !body) {
+    return error;
+  }
+
+  const validationError = await validateInstallmentRequest(supabase, body);
+  if (validationError) {
+    return validationError;
+  }
+
+  const rpcResult = await supabase.rpc("replace_installment_with_transactions", {
+    p_title: body.title,
+    p_total_installments: body.totalInstallments,
+    p_current_installment: body.currentInstallment,
+    p_monthly_amount: body.monthlyAmount,
+    p_start_date: body.startDate,
+    p_end_date: body.endDate,
+    p_payer_user_id: body.payerUserId,
+    p_split_type: body.splitType
+  });
+
+  if (!rpcResult.error && rpcResult.data) {
+    const result = await loadInstallmentResponse(supabase, rpcResult.data, body.billingCycleId);
+    return NextResponse.json(result);
+  }
+
+  if (rpcResult.error && !isMissingRpcFunction(rpcResult.error)) {
+    return NextResponse.json({ error: rpcResult.error.message }, { status: 400 });
+  }
 
   const { data: installmentRow, error: installmentError } = await supabase
     .from("installments")
@@ -301,7 +378,36 @@ export async function PUT(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const body = (await request.json()) as InstallmentRequestBody;
+  const { data: body, error: parseError } = await parseJsonWithSchema(request, installmentSchema);
+  if (parseError || !body) {
+    return parseError;
+  }
+
+  const validationError = await validateInstallmentRequest(supabase, body);
+  if (validationError) {
+    return validationError;
+  }
+
+  const rpcResult = await supabase.rpc("replace_installment_with_transactions", {
+    p_installment_id: body.id ?? null,
+    p_title: body.title,
+    p_total_installments: body.totalInstallments,
+    p_current_installment: body.currentInstallment,
+    p_monthly_amount: body.monthlyAmount,
+    p_start_date: body.startDate,
+    p_end_date: body.endDate,
+    p_payer_user_id: body.payerUserId,
+    p_split_type: body.splitType
+  });
+
+  if (!rpcResult.error && rpcResult.data) {
+    const result = await loadInstallmentResponse(supabase, rpcResult.data, body.billingCycleId);
+    return NextResponse.json(result);
+  }
+
+  if (rpcResult.error && !isMissingRpcFunction(rpcResult.error)) {
+    return NextResponse.json({ error: rpcResult.error.message }, { status: 400 });
+  }
 
   const { data: existingInstallment, error: existingInstallmentError } = await supabase
     .from("installments")
@@ -372,7 +478,22 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const body = (await request.json()) as { id: string };
+  const { data: body, error } = await parseJsonWithSchema(request, deleteByIdSchema);
+  if (error || !body) {
+    return error;
+  }
+
+  const rpcResult = await supabase.rpc("delete_installment_with_transactions", {
+    p_installment_id: body.id
+  });
+
+  if (!rpcResult.error) {
+    return NextResponse.json({ success: true });
+  }
+
+  if (!isMissingRpcFunction(rpcResult.error)) {
+    return NextResponse.json({ error: rpcResult.error.message }, { status: 400 });
+  }
 
   try {
     await deleteLinkedTransactions(body.id);

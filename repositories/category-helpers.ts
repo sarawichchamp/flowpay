@@ -20,6 +20,11 @@ export async function findCategoryIdByAlias(
   const { data, error } = await supabase.from("categories").select("id,name");
   if (error) throw error;
 
+  const matchedById = data.find((category) => category.id === alias);
+  if (matchedById) {
+    return matchedById.id;
+  }
+
   const matched = data.find((category) => candidateNames.includes(category.name));
   return matched?.id ?? data[0]?.id ?? null;
 }

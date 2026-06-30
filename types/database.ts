@@ -152,7 +152,34 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      replace_installment_with_transactions: {
+        Args: {
+          p_installment_id?: string | null;
+          p_title: string;
+          p_total_installments: number;
+          p_current_installment: number;
+          p_monthly_amount: number;
+          p_start_date: string;
+          p_end_date: string;
+          p_payer_user_id: string;
+          p_split_type: Database["public"]["Tables"]["installments"]["Row"]["split_type"];
+        };
+        Returns: string;
+      };
+      delete_installment_with_transactions: {
+        Args: {
+          p_installment_id: string;
+        };
+        Returns: boolean;
+      };
+      commit_flowpay_history: {
+        Args: {
+          p_payload: Json;
+        };
+        Returns: Json;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
