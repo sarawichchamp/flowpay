@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Fingerprint, KeyRound, LogOut, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { Bell, BellOff, Fingerprint, KeyRound, LogOut, Pencil, Plus, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
@@ -77,6 +77,21 @@ function settingsCopy(locale: "th" | "en") {
         passkeyRemoved: "ลบ passkey แล้ว",
         securityError: "จัดการข้อมูลความปลอดภัยไม่สำเร็จ",
         signOut: "ออกจากระบบ"
+        ,
+        pushTitle: "แจ้งเตือนบนมือถือ",
+        pushHint: "เปิด Web Push สำหรับแอปที่ติดตั้งบน Home Screen เพื่อให้รู้ทันทีเมื่ออีกคนบันทึกรายการใหม่",
+        pushEnable: "เปิดการแจ้งเตือน",
+        pushDisable: "ปิดการแจ้งเตือน",
+        pushLoading: "กำลังตรวจสอบสถานะการแจ้งเตือน...",
+        pushEnabled: "อุปกรณ์นี้เปิดรับการแจ้งเตือนแล้ว",
+        pushDisabled: "อุปกรณ์นี้ยังไม่ได้เปิดรับการแจ้งเตือน",
+        pushUnsupported: "อุปกรณ์หรือเบราว์เซอร์นี้ยังไม่รองรับ Web Push สำหรับแอปนี้",
+        pushPermissionDenied: "เบราว์เซอร์ปฏิเสธสิทธิ์แจ้งเตือน โปรดเปิดสิทธิ์ Notifications ให้ FlowPay ในการตั้งค่าเครื่อง",
+        pushInstallHint: "บน iPhone/iPad ควรเปิดใช้งานหลังติดตั้งแอปจาก Home Screen แล้ว",
+        pushEnableSuccess: "เปิดการแจ้งเตือนบนอุปกรณ์นี้แล้ว",
+        pushDisableSuccess: "ปิดการแจ้งเตือนบนอุปกรณ์นี้แล้ว",
+        pushUnavailable: "ระบบหลังบ้านยังไม่ได้ตั้งค่า Web Push",
+        pushDemoUnavailable: "โหมดเดโมไม่รองรับการแจ้งเตือนบนมือถือ"
       }
     : {
         summary: "Settlement page",
@@ -131,7 +146,39 @@ function settingsCopy(locale: "th" | "en") {
         passkeyRemoved: "Passkey removed",
         securityError: "Unable to manage account security",
         signOut: "Sign out"
+        ,
+        pushTitle: "Mobile notifications",
+        pushHint: "Enable Web Push for the Home Screen app so you get alerted when your partner records a new transaction.",
+        pushEnable: "Enable notifications",
+        pushDisable: "Disable notifications",
+        pushLoading: "Checking notification status...",
+        pushEnabled: "This device is already receiving notifications.",
+        pushDisabled: "This device is not receiving notifications yet.",
+        pushUnsupported: "This device or browser does not support Web Push for this app.",
+        pushPermissionDenied: "Notification permission was denied. Please enable notifications for FlowPay in your device settings.",
+        pushInstallHint: "On iPhone and iPad, enable this after installing the app from the Home Screen.",
+        pushEnableSuccess: "Notifications are enabled on this device.",
+        pushDisableSuccess: "Notifications are disabled on this device.",
+        pushUnavailable: "Web Push is not configured for this project yet.",
+        pushDemoUnavailable: "Mobile notifications are unavailable in demo mode."
       };
+}
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; i += 1) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+
+  return outputArray;
+}
+
+function isStandaloneMode() {
+  return window.matchMedia("(display-mode: standalone)").matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
 
 function formatDateTime(locale: "th" | "en", value?: string) {
@@ -153,7 +200,7 @@ export default function SettingsPage() {
   const copy = settingsCopy(locale);
   const passkeysUnavailableMessage =
     locale === "th" ? "โปรเจ็กต์นี้ยังไม่ได้เปิดใช้งาน Passkeys ในระบบหลังบ้าน" : "Passkeys are not enabled for this project yet.";
-  const { transactionTypePresets, addTransactionTypePreset, updateTransactionTypePreset, deleteTransactionTypePreset } = useFlowPayStore();
+  const { mode, transactionTypePresets, addTransactionTypePreset, updateTransactionTypePreset, deleteTransactionTypePreset } = useFlowPayStore();
   const [label, setLabel] = useState("");
   const [baseType, setBaseType] = useState<TransactionTypePresetBaseType>("normal");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -169,6 +216,14 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushConfigured, setPushConfigured] = useState(Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY));
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(true);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState("");
+  const [pushMessage, setPushMessage] = useState("");
+  const [isStandalone, setIsStandalone] = useState(false);
 
   const themeOptions: Array<{ value: UITheme; label: string; hint: string }> = [
     { value: "standard", label: copy.themeStandard, hint: copy.themeStandardHint },
@@ -245,6 +300,52 @@ export default function SettingsPage() {
   useEffect(() => {
     void loadPasskeys();
   }, []);
+
+  async function loadPushStatus() {
+    setPushLoading(true);
+    setPushError("");
+    setPushConfigured(Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY));
+
+    if (mode !== "production") {
+      setPushSupported(false);
+      setPushEnabled(false);
+      setPushLoading(false);
+      return;
+    }
+
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+      setPushSupported(false);
+      setPushEnabled(false);
+      setPushLoading(false);
+      return;
+    }
+
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      setPushSupported(false);
+      setPushEnabled(false);
+      setPushLoading(false);
+      return;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+
+      setPushSupported(true);
+      setPushEnabled(Boolean(subscription));
+      setIsStandalone(isStandaloneMode());
+    } catch (error: unknown) {
+      setPushSupported(false);
+      setPushEnabled(false);
+      setPushError(error instanceof Error ? error.message : copy.pushUnsupported);
+    } finally {
+      setPushLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadPushStatus();
+  }, [mode]);
 
   async function handleRegisterPasskey() {
     setCreatingPasskey(true);
@@ -333,10 +434,138 @@ export default function SettingsPage() {
   }
 
   async function handleSignOut() {
+    if ("serviceWorker" in navigator && "PushManager" in window) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+
+        if (subscription) {
+          const response = await fetch("/api/push-subscriptions", {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ endpoint: subscription.endpoint })
+          }).catch(() => null);
+
+          if (response?.ok === false) {
+            const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+            throw new Error(payload?.error ?? "Failed to unregister push subscription");
+          }
+
+          await subscription.unsubscribe().catch(() => undefined);
+        }
+      } catch {
+        // Best effort cleanup before sign out.
+      }
+    }
+
     const supabase = createClient();
     await supabase.auth.signOut();
     router.replace("/auth/login");
     router.refresh();
+  }
+
+  async function handleEnablePush() {
+    setPushBusy(true);
+    setPushError("");
+    setPushMessage("");
+
+    try {
+      if (mode !== "production") {
+        setPushError(copy.pushDemoUnavailable);
+        return;
+      }
+
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        setPushError(copy.pushUnavailable);
+        return;
+      }
+
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        setPushError(copy.pushUnsupported);
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setPushError(copy.pushPermissionDenied);
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+        });
+      }
+
+      const response = await fetch("/api/push-subscriptions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(subscription.toJSON())
+      });
+
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to enable push notifications");
+      }
+
+      setPushEnabled(true);
+      setPushSupported(true);
+      setPushMessage(copy.pushEnableSuccess);
+      setIsStandalone(isStandaloneMode());
+    } catch (error: unknown) {
+      setPushError(error instanceof Error ? error.message : copy.pushUnsupported);
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function handleDisablePush() {
+    setPushBusy(true);
+    setPushError("");
+    setPushMessage("");
+
+    try {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        setPushEnabled(false);
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+
+      if (subscription) {
+        const response = await fetch("/api/push-subscriptions", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ endpoint: subscription.endpoint })
+        });
+
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        if (!response.ok) {
+          throw new Error(payload?.error ?? "Failed to disable push notifications");
+        }
+
+        await subscription.unsubscribe();
+      }
+
+      setPushEnabled(false);
+      setPushMessage(copy.pushDisableSuccess);
+    } catch (error: unknown) {
+      setPushError(error instanceof Error ? error.message : copy.pushUnsupported);
+    } finally {
+      setPushBusy(false);
+    }
   }
 
   return (
@@ -367,6 +596,59 @@ export default function SettingsPage() {
               </button>
             );
           })}
+        </div>
+      </Card>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+            <Smartphone className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">{copy.pushTitle}</h2>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.pushHint}</p>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-slate-200 p-4 dark:border-white/10">
+          <p className="text-sm font-medium">
+            {pushLoading
+              ? copy.pushLoading
+              : pushEnabled
+                ? copy.pushEnabled
+                : pushSupported
+                  ? copy.pushDisabled
+                  : pushConfigured
+                    ? copy.pushUnsupported
+                    : mode === "production"
+                      ? copy.pushUnavailable
+                      : copy.pushDemoUnavailable}
+          </p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.pushInstallHint}</p>
+          {pushSupported && !isStandalone ? <p className="mt-2 text-sm text-amber-600 dark:text-amber-300">{copy.pushInstallHint}</p> : null}
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button
+              type="button"
+              onClick={() => void handleEnablePush()}
+              disabled={pushBusy || pushLoading || !pushConfigured || mode !== "production"}
+            >
+              <Bell className="h-4 w-4" />
+              {copy.pushEnable}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => void handleDisablePush()}
+              disabled={pushBusy || pushLoading || !pushEnabled}
+            >
+              <BellOff className="h-4 w-4" />
+              {copy.pushDisable}
+            </Button>
+          </div>
+
+          {pushError ? <p className="mt-4 text-sm text-red-500">{pushError}</p> : null}
+          {!pushError && pushMessage ? <p className="mt-4 text-sm text-teal-600 dark:text-teal-300">{pushMessage}</p> : null}
         </div>
       </Card>
 

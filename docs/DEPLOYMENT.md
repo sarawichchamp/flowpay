@@ -16,6 +16,7 @@ Open `http://localhost:3000`.
 3. Add environment variables from `.env.example`.
 4. Deploy with the default Next.js preset.
 5. Add your Vercel production URL to Supabase Google OAuth redirect URLs.
+6. Generate VAPID keys with `npx web-push generate-vapid-keys` and add `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` to Vercel.
 
 ## Supabase
 
@@ -32,4 +33,5 @@ Open `http://localhost:3000`.
 - Confirm RLS policies in Supabase policy simulator.
 - Test OCR on Thai and English receipt samples.
 - Verify PWA install prompt on Android Chrome and iOS Safari.
+- Install the production app on Home Screen and verify push permission plus end-to-end delivery on one iPhone and one Android device.
 - Add Vercel preview URL to Supabase Auth redirect URLs before QA.

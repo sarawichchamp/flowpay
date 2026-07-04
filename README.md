@@ -4,6 +4,8 @@ FlowPay is a mobile-first shared finance app for couples. It centers on a shared
 
 When `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `FLOWPAY_MEMBER_1_NAME`, `FLOWPAY_MEMBER_1_EMAIL`, `FLOWPAY_MEMBER_2_NAME`, and `FLOWPAY_MEMBER_2_EMAIL` are configured, the app runs in production mode with Supabase-backed data writes. Only those two pre-created Supabase Auth users are allowed into the household. They sign in with their assigned email/password and can optionally add passkeys for biometric sign-in on supported devices. Without that configuration, it falls back to demo mode for local evaluation.
 
+For Home Screen push notifications, also configure `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`.
+
 ## Production Auth Setup
 
 1. In Supabase Auth, disable public self-sign-up.
@@ -26,6 +28,7 @@ FlowPay production mode will not auto-create users. If either configured househo
 - Framer Motion
 - Recharts
 - Supabase Auth, PostgreSQL, Storage, Realtime
+- Web Push via service worker for installed mobile PWA notifications
 - Tesseract.js OCR
 - PWA manifest and service worker
 

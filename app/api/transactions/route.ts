@@ -3,6 +3,7 @@ import type { z } from "zod";
 import { findCategoryIdByAlias } from "@/repositories/category-helpers";
 import { requireHouseholdApiAccess } from "@/services/flowpay/api-access";
 import { ensureBillingCycleExists, getHouseholdProfileIds } from "@/services/flowpay/request-validation";
+import { dispatchPushNotificationsForTransactions } from "@/services/notifications/dispatch-push";
 import { createAdminClient } from "@/services/supabase/admin";
 import type { Transaction } from "@/types/domain";
 import { deleteByIdSchema, transactionBatchSchema, transactionSchema, transactionUpdateSchema } from "@/utils/validation";
@@ -136,6 +137,8 @@ export async function POST(request: Request) {
 
     createdTransactions.push(mapTransaction(data));
   }
+
+  await dispatchPushNotificationsForTransactions(createdTransactions.map((transaction) => transaction.id));
 
   if ("transactions" in parsed.data) {
     return NextResponse.json({ transactions: createdTransactions });

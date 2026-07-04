@@ -171,6 +171,17 @@ create table public.notifications (
   created_at timestamptz not null default now()
 );
 
+create table public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  user_agent text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table public.translation_pairs (
   id uuid primary key default gen_random_uuid(),
   translation_key text not null unique,
@@ -189,6 +200,7 @@ create index transactions_payer_idx on public.transactions (payer_user_id);
 create index transactions_type_idx on public.transactions (transaction_type);
 create index installments_payer_idx on public.installments (payer_user_id);
 create index notifications_recipient_unread_idx on public.notifications (recipient_user_id, read_at, created_at desc);
+create index push_subscriptions_user_idx on public.push_subscriptions (user_id, updated_at desc);
 create index translation_pairs_key_idx on public.translation_pairs (translation_key);
 
 alter table public.profiles enable row level security;
@@ -198,6 +210,7 @@ alter table public.transactions enable row level security;
 alter table public.installments enable row level security;
 alter table public.installment_transactions enable row level security;
 alter table public.notifications enable row level security;
+alter table public.push_subscriptions enable row level security;
 alter table public.translation_pairs enable row level security;
 
 create or replace function public.is_household_member(user_id uuid)
@@ -278,6 +291,12 @@ to authenticated
 using (recipient_user_id = auth.uid())
 with check (recipient_user_id = auth.uid());
 
+create policy "users can manage own push subscriptions"
+on public.push_subscriptions for all
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
 create policy "household can manage translation pairs"
 on public.translation_pairs for all
 to authenticated
@@ -338,6 +357,20 @@ drop trigger if exists installment_transactions_validate_business_rules on publi
 create trigger installment_transactions_validate_business_rules
 before insert or update on public.installment_transactions
 for each row execute function public.validate_installment_transaction_business_rules();
+
+create or replace function public.touch_push_subscriptions_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+create trigger push_subscriptions_touch_updated_at
+before update on public.push_subscriptions
+for each row execute function public.touch_push_subscriptions_updated_at();
 
 create or replace function public.touch_translation_pairs_updated_at()
 returns trigger

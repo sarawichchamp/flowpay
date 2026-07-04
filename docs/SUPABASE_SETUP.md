@@ -10,5 +10,6 @@
 6. Copy Project URL and anon key into `.env.local`.
 7. Enable Realtime for `notifications` and `transactions` in Database -> Replication.
 8. Create exactly two `profiles` rows after the first two users sign in, or add an `auth.users` trigger to create them automatically.
+9. Re-run `supabase/schema.sql` after adding the `push_subscriptions` table and policy updates.
 
 The schema is intentionally scoped to two profiles. RLS allows household-level access while keeping anonymous users out.
