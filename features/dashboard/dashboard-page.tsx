@@ -950,8 +950,8 @@ export function DashboardPage() {
         </Card>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
-        <Card>
+      <section className="grid min-w-0 gap-4 lg:grid-cols-[1fr_0.9fr]">
+        <Card className="min-w-0 overflow-hidden">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold">{copy.latestTransactions}</h2>
             <Badge>{transactions.length} {t(locale, "items")}</Badge>
@@ -961,8 +961,8 @@ export function DashboardPage() {
               .slice()
               .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
               .map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 dark:bg-white/5">
-                <div className="flex min-w-0 items-center gap-2 text-sm">
+              <div key={transaction.id} className="flex min-w-0 items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 dark:bg-white/5">
+                <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
                   <span className="shrink-0 text-slate-500 dark:text-slate-400">{formatShortDate(transaction.date)}</span>
                   <span className="truncate font-semibold">{transaction.title}</span>
                   <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{transaction.transactionType}</span>
