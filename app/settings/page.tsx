@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, BellOff, Fingerprint, KeyRound, LogOut, Pencil, Plus, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
+import { Bell, BellOff, Fingerprint, KeyRound, LogOut, Palette, Pencil, Plus, Settings2, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
@@ -224,6 +224,8 @@ export default function SettingsPage() {
   const [pushError, setPushError] = useState("");
   const [pushMessage, setPushMessage] = useState("");
   const [isStandalone, setIsStandalone] = useState(false);
+  const compactFieldClass = "h-7 rounded-lg px-2.5 text-[13px]";
+  const compactSelectClass = "h-7 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[13px] dark:border-white/10 dark:bg-white/10";
 
   const themeOptions: Array<{ value: UITheme; label: string; hint: string }> = [
     { value: "standard", label: copy.themeStandard, hint: copy.themeStandardHint },
@@ -569,14 +571,29 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-black">{t(locale, "settings")}</h1>
+    <div className="space-y-2.5">
+      <Card className="overflow-hidden p-3 sm:p-4">
+        <div className="flex items-start gap-2.5">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
+            <Settings2 className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold sm:text-xl">{t(locale, "settings")}</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{copy.appearanceHint}</p>
+          </div>
+        </div>
 
-      <Card>
-        <h2 className="text-xl font-bold">{copy.appearanceTitle}</h2>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.appearanceHint}</p>
+        <div className="mt-3 flex items-start gap-2.5">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+            <Palette className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold">{copy.appearanceTitle}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{copy.appearanceHint}</p>
+          </div>
+        </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-3 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
           {themeOptions.map((option) => {
             const active = uiTheme === option.value;
             return (
@@ -585,116 +602,66 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => setUITheme(option.value)}
                 className={[
-                  "rounded-2xl border px-4 py-4 text-left transition",
+                  "rounded-lg border px-3 py-2.5 text-left transition",
                   active
                     ? "border-teal-500 bg-teal-500/10 ring-2 ring-teal-500/20"
                     : "border-slate-200 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5"
                 ].join(" ")}
               >
-                <p className="font-semibold capitalize">{option.label}</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{option.hint}</p>
+                <p className="text-sm font-semibold capitalize">{option.label}</p>
+                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{option.hint}</p>
               </button>
             );
           })}
         </div>
       </Card>
 
-      <Card>
-        <div className="flex items-start gap-3">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
-            <Smartphone className="h-5 w-5" />
+      <Card className="overflow-hidden p-3 sm:p-4">
+        <div className="flex items-start gap-2.5">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-teal-500 text-slate-950">
+            <ShieldCheck className="h-4 w-4" />
           </div>
-          <div>
-            <h2 className="text-xl font-bold">{copy.pushTitle}</h2>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.pushHint}</p>
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-2xl border border-slate-200 p-4 dark:border-white/10">
-          <p className="text-sm font-medium">
-            {pushLoading
-              ? copy.pushLoading
-              : pushEnabled
-                ? copy.pushEnabled
-                : pushSupported
-                  ? copy.pushDisabled
-                  : pushConfigured
-                    ? copy.pushUnsupported
-                    : mode === "production"
-                      ? copy.pushUnavailable
-                      : copy.pushDemoUnavailable}
-          </p>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.pushInstallHint}</p>
-          {pushSupported && !isStandalone ? <p className="mt-2 text-sm text-amber-600 dark:text-amber-300">{copy.pushInstallHint}</p> : null}
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Button
-              type="button"
-              onClick={() => void handleEnablePush()}
-              disabled={pushBusy || pushLoading || !pushConfigured || mode !== "production"}
-            >
-              <Bell className="h-4 w-4" />
-              {copy.pushEnable}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => void handleDisablePush()}
-              disabled={pushBusy || pushLoading || !pushEnabled}
-            >
-              <BellOff className="h-4 w-4" />
-              {copy.pushDisable}
-            </Button>
-          </div>
-
-          {pushError ? <p className="mt-4 text-sm text-red-500">{pushError}</p> : null}
-          {!pushError && pushMessage ? <p className="mt-4 text-sm text-teal-600 dark:text-teal-300">{pushMessage}</p> : null}
-        </div>
-      </Card>
-
-      <Card>
-        <div className="flex items-start gap-3">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-teal-500 text-slate-950">
-            <ShieldCheck className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold">{copy.securityTitle}</h2>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.securityHint}</p>
-            <p className="mt-3 text-sm font-medium">
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold">{copy.securityTitle}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{copy.securityHint}</p>
+            <p className="mt-1.5 text-[13px] font-medium">
               {copy.currentEmail}: <span className="text-slate-500 dark:text-slate-400">{currentEmail || "-"}</span>
             </p>
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-3">
+        <div className="mt-3 flex flex-wrap gap-1.5">
           <Button
             type="button"
+            size="sm"
+            className="h-7 rounded-lg px-2 text-[11px]"
             onClick={() => void handleRegisterPasskey()}
             disabled={creatingPasskey || loadingPasskeys || passwordLoading || !passkeysEnabled}
           >
             <Fingerprint className="h-4 w-4" />
             {copy.registerPasskey}
           </Button>
-          <Button type="button" variant="ghost" onClick={() => void handleSignOut()} disabled={passwordLoading}>
+          <Button type="button" variant="ghost" size="sm" className="h-7 rounded-lg px-2 text-[11px]" onClick={() => void handleSignOut()} disabled={passwordLoading}>
             <LogOut className="h-4 w-4" />
             {copy.signOut}
           </Button>
         </div>
 
-        <form className="mt-5 rounded-2xl border border-slate-200 p-4 dark:border-white/10" onSubmit={handlePasswordUpdate}>
-          <div className="flex items-start gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-950 text-white dark:bg-white dark:text-slate-950">
-              <KeyRound className="h-5 w-5" />
+        <form className="mt-3 rounded-lg border border-slate-200 p-3 dark:border-white/10" onSubmit={handlePasswordUpdate}>
+          <div className="flex items-start gap-2.5">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+              <KeyRound className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="text-lg font-bold">{copy.passwordTitle}</h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.passwordHint}</p>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold">{copy.passwordTitle}</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{copy.passwordHint}</p>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="mt-2.5 grid gap-1.5 md:grid-cols-2">
             <Field label={copy.newPassword}>
               <Input
+                className={compactFieldClass}
                 type="password"
                 autoComplete="new-password"
                 value={newPassword}
@@ -704,6 +671,7 @@ export default function SettingsPage() {
             </Field>
             <Field label={copy.confirmPassword}>
               <Input
+                className={compactFieldClass}
                 type="password"
                 autoComplete="new-password"
                 value={confirmPassword}
@@ -713,24 +681,24 @@ export default function SettingsPage() {
             </Field>
           </div>
 
-          <Button type="submit" className="mt-4" disabled={passwordLoading || !newPassword || !confirmPassword}>
+          <Button type="submit" size="sm" className="mt-2.5 h-7 rounded-lg px-2 text-[11px]" disabled={passwordLoading || !newPassword || !confirmPassword}>
             <KeyRound className="h-4 w-4" />
             {passwordLoading ? copy.savingPassword : copy.updatePassword}
           </Button>
         </form>
 
-        <div className="mt-5 space-y-3">
+        <div className="mt-3 space-y-1.5">
           {loadingPasskeys ? (
             <p className="text-sm text-slate-500 dark:text-slate-400">{copy.loadingPasskeys}</p>
           ) : passkeys.length ? (
             passkeys.map((passkey) => (
-              <div key={passkey.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3 dark:border-white/10">
-                <div>
-                  <p className="font-semibold">{passkey.friendly_name || "Passkey"}</p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <div key={passkey.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2.5 dark:border-white/10">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{passkey.friendly_name || "Passkey"}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                     {copy.addedOn}: {formatDateTime(locale, passkey.created_at)}
                   </p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     {copy.lastUsed}: {formatDateTime(locale, passkey.last_used_at)}
                   </p>
                 </div>
@@ -738,7 +706,7 @@ export default function SettingsPage() {
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="text-red-500"
+                  className="h-7 shrink-0 rounded-lg px-2 text-[11px] text-red-500"
                   onClick={() => void handleDeletePasskey(passkey.id)}
                   disabled={busyPasskeyId === passkey.id || !passkeysEnabled}
                 >
@@ -755,20 +723,81 @@ export default function SettingsPage() {
         {!passkeysEnabled ? <p className="mt-4 text-sm text-amber-600 dark:text-amber-300">{passkeysUnavailableMessage}</p> : null}
         {securityError ? <p className="mt-4 text-sm text-red-500">{securityError}</p> : null}
         {!securityError && securityMessage ? <p className="mt-4 text-sm text-teal-600 dark:text-teal-300">{securityMessage}</p> : null}
+
+        <div className="mt-3 rounded-lg border border-slate-200 p-3 dark:border-white/10">
+          <div className="flex items-start gap-2.5">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-950 text-white dark:bg-white dark:text-slate-950">
+              <Smartphone className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold">{copy.pushTitle}</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{copy.pushHint}</p>
+            </div>
+          </div>
+
+          <p className="mt-2.5 text-[13px] font-medium">
+            {pushLoading
+              ? copy.pushLoading
+              : pushEnabled
+                ? copy.pushEnabled
+                : pushSupported
+                  ? copy.pushDisabled
+                  : pushConfigured
+                    ? copy.pushUnsupported
+                    : mode === "production"
+                      ? copy.pushUnavailable
+                      : copy.pushDemoUnavailable}
+          </p>
+          {pushSupported && !isStandalone ? <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-300">{copy.pushInstallHint}</p> : null}
+
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 rounded-lg px-2 text-[11px]"
+              onClick={() => void handleEnablePush()}
+              disabled={pushBusy || pushLoading || !pushConfigured || mode !== "production"}
+            >
+              <Bell className="h-4 w-4" />
+              {copy.pushEnable}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 rounded-lg px-2 text-[11px]"
+              onClick={() => void handleDisablePush()}
+              disabled={pushBusy || pushLoading || !pushEnabled}
+            >
+              <BellOff className="h-4 w-4" />
+              {copy.pushDisable}
+            </Button>
+          </div>
+
+          {pushError ? <p className="mt-2 text-sm text-red-500">{pushError}</p> : null}
+          {!pushError && pushMessage ? <p className="mt-2 text-sm text-teal-600 dark:text-teal-300">{pushMessage}</p> : null}
+        </div>
       </Card>
 
-      <Card>
-        <h2 className="text-xl font-bold">{copy.typePresets}</h2>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{copy.typePresetsHint}</p>
+      <Card className="overflow-hidden p-3 sm:p-4">
+        <div className="flex items-start gap-2.5">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
+            <Plus className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold">{copy.typePresets}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{copy.typePresetsHint}</p>
+          </div>
+        </div>
 
-        <form className="mt-5 space-y-4" onSubmit={handlePresetSubmit}>
-          <div className="grid gap-3 md:grid-cols-[1.1fr_0.9fr_auto]">
+        <form className="mt-3 space-y-2" onSubmit={handlePresetSubmit}>
+          <div className="grid gap-1.5 md:grid-cols-[1.1fr_0.9fr_auto]">
             <Field label={copy.presetName}>
-              <Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={copy.presetName} />
+              <Input className={compactFieldClass} value={label} onChange={(event) => setLabel(event.target.value)} placeholder={copy.presetName} />
             </Field>
             <Field label={copy.presetBehavior}>
               <select
-                className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm dark:border-white/10 dark:bg-white/10"
+                className={compactSelectClass}
                 value={baseType}
                 onChange={(event) => setBaseType(event.target.value as TransactionTypePresetBaseType)}
               >
@@ -776,13 +805,13 @@ export default function SettingsPage() {
                 <option value="normal">{copy.presetNormal}</option>
               </select>
             </Field>
-            <div className="flex items-end gap-2">
-              <Button type="submit">
+            <div className="flex items-end gap-1">
+              <Button type="submit" size="sm" className="h-7 rounded-lg px-2 text-[11px]">
                 <Plus className="h-4 w-4" />
                 {editingId ? copy.savePreset : copy.addPreset}
               </Button>
               {editingId ? (
-                <Button type="button" variant="ghost" onClick={resetPresetForm}>
+                <Button type="button" variant="ghost" size="sm" className="h-7 rounded-lg px-2 text-[11px]" onClick={resetPresetForm}>
                   {copy.cancelEdit}
                 </Button>
               ) : null}
@@ -791,22 +820,22 @@ export default function SettingsPage() {
           {error ? <p className="text-sm text-red-500">{error}</p> : null}
         </form>
 
-        <div className="mt-5 space-y-3">
+        <div className="mt-3 space-y-1.5">
           {transactionTypePresets.length ? (
             transactionTypePresets.map((preset) => (
-              <div key={preset.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3 dark:border-white/10">
-                <div>
-                  <p className="font-semibold">{preset.label}</p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+              <div key={preset.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2.5 dark:border-white/10">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{preset.label}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     {preset.baseType === "food" ? copy.presetFood : copy.presetNormal}
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" variant="secondary" onClick={() => startEditingPreset(preset.id)}>
+                <div className="flex shrink-0 gap-1.5">
+                  <Button type="button" size="sm" variant="secondary" className="h-7 rounded-lg px-2 text-[11px]" onClick={() => startEditingPreset(preset.id)}>
                     <Pencil className="h-4 w-4" />
                     {copy.editPreset}
                   </Button>
-                  <Button type="button" size="sm" variant="ghost" className="text-red-500" onClick={() => deleteTransactionTypePreset(preset.id)}>
+                  <Button type="button" size="sm" variant="ghost" className="h-7 rounded-lg px-2 text-[11px] text-red-500" onClick={() => deleteTransactionTypePreset(preset.id)}>
                     <Trash2 className="h-4 w-4" />
                     {copy.deletePreset}
                   </Button>
@@ -817,17 +846,15 @@ export default function SettingsPage() {
             <p className="text-sm text-slate-500 dark:text-slate-400">{copy.emptyPreset}</p>
           )}
         </div>
-      </Card>
 
-      <Card>
-        <div className="space-y-3">
-          <Link href="/settlement" className="block rounded-2xl border border-slate-200 px-4 py-4 transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">
-            <p className="font-semibold">{copy.summary}</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.summaryHint}</p>
+        <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-3 dark:border-white/10">
+          <Link href="/settlement" className="block rounded-lg border border-slate-200 px-3 py-2.5 transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">
+            <p className="text-sm font-semibold">{copy.summary}</p>
+            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{copy.summaryHint}</p>
           </Link>
-          <Link href="/import-history" className="block rounded-2xl border border-slate-200 px-4 py-4 transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">
-            <p className="font-semibold">{copy.importHistory}</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.importHint}</p>
+          <Link href="/import-history" className="block rounded-lg border border-slate-200 px-3 py-2.5 transition hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/5">
+            <p className="text-sm font-semibold">{copy.importHistory}</p>
+            <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{copy.importHint}</p>
           </Link>
         </div>
       </Card>

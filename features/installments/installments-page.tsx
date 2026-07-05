@@ -52,12 +52,43 @@ function installmentsCopy(locale: "th" | "en") {
       };
 }
 
+function SegmentedButtonGroup<T extends string>({
+  value,
+  options,
+  onChange,
+  className
+}: {
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+  className?: string;
+}) {
+  return (
+    <div className={["flex flex-wrap gap-1.5", className].filter(Boolean).join(" ")}>
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <Button
+            key={option.value}
+            type="button"
+            size="sm"
+            variant={selected ? "primary" : "secondary"}
+            className={selected ? "h-7 min-w-fit rounded-lg px-2 text-[11px] shadow-none" : "h-7 min-w-fit rounded-lg px-2 text-[11px]"}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function InstallmentsPage() {
   const { locale } = useLocale();
   const { currentCycle, installments, transactions, addInstallment, updateInstallment, deleteInstallment, users } = useFlowPayStore();
   const copy = installmentsCopy(locale);
-  const compactFieldClass = "h-10 rounded-xl px-3 text-sm";
-  const compactSelectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm dark:border-white/10 dark:bg-white/10";
+  const compactFieldClass = "h-7 rounded-lg px-2.5 text-[13px]";
   const [title, setTitle] = useState("");
   const [totalInstallments, setTotalInstallments] = useState("10");
   const [currentInstallment, setCurrentInstallment] = useState("1");
@@ -69,6 +100,14 @@ export function InstallmentsPage() {
   const [submitError, setSubmitError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [editingInstallmentId, setEditingInstallmentId] = useState<string | null>(null);
+  const payerOptions = users.map((user) => ({
+    value: user.id,
+    label: user.displayName
+  }));
+  const splitOptions = splitTypeOptions.map((option) => ({
+    value: option.value,
+    label: t(locale, option.labelKey)
+  }));
 
   function resetForm() {
     setEditingInstallmentId(null);
@@ -147,23 +186,23 @@ export function InstallmentsPage() {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[0.88fr_1.12fr]">
-      <Card className="p-4 sm:p-5">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
-            <Repeat className="h-5 w-5" />
+    <div className="grid gap-2.5 xl:grid-cols-[0.92fr_1.08fr]">
+      <Card className="overflow-hidden p-3 sm:p-4">
+        <div className="flex items-start gap-2.5">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
+            <Repeat className="h-4 w-4" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-lg font-bold sm:text-xl">{editingInstallmentId ? copy.editTitle : copy.createTitle}</h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
           </div>
         </div>
 
-        <form className="mt-4 space-y-2.5" onSubmit={handleSubmit}>
+        <form className="mt-3 space-y-1.5" onSubmit={handleSubmit}>
           <Field label={t(locale, "installmentTitle")}>
             <Input className={compactFieldClass} placeholder={t(locale, "installmentTitle")} value={title} onChange={(event) => setTitle(event.target.value)} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-1.5">
             <Field label={t(locale, "totalInstallments")}>
               <Input className={compactFieldClass} type="number" min="1" value={totalInstallments} onChange={(event) => setTotalInstallments(event.target.value)} />
             </Field>
@@ -174,7 +213,7 @@ export function InstallmentsPage() {
           <Field label={t(locale, "monthlyAmount")}>
             <Input className={compactFieldClass} type="number" min="0" step="0.01" value={monthlyAmount} onChange={(event) => setMonthlyAmount(event.target.value)} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-1.5">
             <Field label={t(locale, "startDate")}>
               <Input className={compactFieldClass} type="date" aria-label={t(locale, "startDate")} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
             </Field>
@@ -183,41 +222,27 @@ export function InstallmentsPage() {
             </Field>
           </div>
           <Field label={t(locale, "paid")}>
-            <select
-              className={compactSelectClass}
-              value={payerUserId}
-              onChange={(event) => setPayerUserId(event.target.value)}
-            >
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.displayName} {t(locale, "paid")}
-                </option>
-              ))}
-            </select>
+            <SegmentedButtonGroup value={payerUserId} options={payerOptions} onChange={setPayerUserId} />
           </Field>
           <Field label={t(locale, "settlement")}>
-            <select
-              className={compactSelectClass}
-              value={splitType}
-              onChange={(event) => setSplitType(event.target.value as SplitType)}
-            >
-              {splitTypeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {t(locale, option.labelKey)}
-                </option>
-              ))}
-            </select>
+            <SegmentedButtonGroup value={splitType} options={splitOptions} onChange={(value) => setSplitType(value as SplitType)} />
           </Field>
-          <div className="grid grid-cols-[auto_1fr] gap-3">
+          <div className="grid grid-cols-2 gap-1">
             {editingInstallmentId ? (
-              <Button type="button" variant="ghost" onClick={resetForm}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 w-full whitespace-nowrap px-2 text-[11px] !text-red-500 hover:bg-red-50 hover:!text-red-600 dark:hover:bg-red-500/10 dark:hover:!text-red-400"
+                onClick={resetForm}
+              >
                 <X className="h-4 w-4" />
                 {copy.cancelEdit}
               </Button>
             ) : (
-              <span />
+              <span className="hidden sm:block" />
             )}
-            <Button type="submit" className="w-full" disabled={isSaving}>
+            <Button type="submit" size="sm" className="h-7 w-full whitespace-nowrap px-2 text-[11px]" disabled={isSaving}>
               {editingInstallmentId ? copy.update : t(locale, "save")}
             </Button>
           </div>
@@ -225,12 +250,12 @@ export function InstallmentsPage() {
         </form>
       </Card>
 
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-black">{t(locale, "installments")}</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.subtitle}</p>
+      <Card className="overflow-hidden p-4 sm:p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold sm:text-xl">{t(locale, "installments")}</h2>
+          <Repeat className="h-5 w-5 text-teal-600 dark:text-teal-300" />
         </div>
-        <div className="grid gap-4">
+        <div className="mt-3 space-y-1.5">
           {installments.map((item) => {
             const currentCycleTransaction = transactions.find(
               (transaction) => transaction.installmentId === item.id && transaction.billingCycleId === currentCycle.id
@@ -239,27 +264,27 @@ export function InstallmentsPage() {
             const displayInstallmentNumber = parsedProgress?.installmentNumber ?? item.currentInstallment;
             const progress = Math.round((displayInstallmentNumber / item.totalInstallments) * 100);
             return (
-              <Card key={item.id} className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
+              <div key={item.id} className="rounded-xl border border-slate-200 px-3 py-2.5 dark:border-white/10">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
                     <Badge>{t(locale, splitTypeOptions.find((option) => option.value === item.splitType)?.labelKey ?? "splitHalf")}</Badge>
-                    <h3 className="mt-2 text-xl font-black">{item.title}</h3>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <h3 className="mt-1.5 truncate text-base font-bold">{item.title}</h3>
+                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                       {displayInstallmentNumber}/{item.totalInstallments} {t(locale, "paidProgress")}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-black">{formatTHB(item.monthlyAmount)}</p>
+                  <div className="shrink-0 text-right">
+                    <p className="text-base font-black">{formatTHB(item.monthlyAmount)}</p>
                     {editingInstallmentId === item.id ? (
-                      <p className="mt-2 text-xs font-semibold text-teal-600 dark:text-teal-300">{copy.editingBadge}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-teal-600 dark:text-teal-300">{copy.editingBadge}</p>
                     ) : null}
                   </div>
                 </div>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
                   <div className="h-full rounded-full bg-teal-500" style={{ width: `${progress}%` }} />
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" size="sm" variant="secondary" onClick={() => startEditing(item.id)}>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  <Button type="button" size="sm" variant="secondary" className="h-7 rounded-lg px-2 text-[11px]" onClick={() => startEditing(item.id)}>
                     <Pencil className="h-4 w-4" />
                     {copy.edit}
                   </Button>
@@ -267,18 +292,18 @@ export function InstallmentsPage() {
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                    className="h-7 rounded-lg px-2 text-[11px] text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
                     onClick={() => void handleDelete(item.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                     {copy.delete}
                   </Button>
                 </div>
-              </Card>
+              </div>
             );
           })}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
