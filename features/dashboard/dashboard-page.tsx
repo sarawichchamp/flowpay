@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { eachDayOfInterval, format, parseISO } from "date-fns";
 import { motion } from "framer-motion";
-import { CalendarDays, ChevronDown, PieChart as PieChartIcon, TrendingDown, Wallet, X } from "lucide-react";
-import { Bar, BarChart, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CalendarDays, ChevronDown, TrendingDown, Wallet, X } from "lucide-react";
+import { Bar, BarChart, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { SummaryRow } from "@/features/settlement/types";
@@ -17,7 +17,7 @@ import { createClient } from "@/services/supabase/browser";
 import { generateInstallmentTransactions } from "@/services/installments/generate-installment-transactions";
 import { getCategoryLabel } from "@/utils/categories";
 import { formatTHB, roundMoney } from "@/utils/currency";
-import { formatShortDate, inclusiveDays } from "@/utils/date";
+import { formatShortDate } from "@/utils/date";
 import { formatInstallmentProgressLabel, parseInstallmentProgress } from "@/utils/installments";
 
 function toLocalDateKey(value: Date) {
@@ -33,12 +33,6 @@ export function DashboardPage() {
   const [chartsReady, setChartsReady] = useState(false);
   const [detailsModalType, setDetailsModalType] = useState<"food" | "other" | "installment" | null>(null);
   const [historicalSummaries, setHistoricalSummaries] = useState<SummaryRow[]>([]);
-  const [dailyChartXZoom, setDailyChartXZoom] = useState(1);
-  const [dailyChartYZoom, setDailyChartYZoom] = useState(1);
-  const dailyChartInteractionRef = useRef<HTMLDivElement | null>(null);
-  const dailyChartScrollRef = useRef<HTMLDivElement | null>(null);
-  const dailyChartDragRef = useRef<{ pointerId: number; startX: number; scrollLeft: number } | null>(null);
-  const dailyChartTouchRef = useRef<{ axis: "x" | "y"; lastX: number; lastY: number; pinchDistance: number | null } | null>(null);
 
   const monthlySummaryLink =
     locale === "th"
@@ -189,8 +183,7 @@ export function DashboardPage() {
     [foodTransactions, locale, transactions]
   );
 
-  const totalCycleDays = inclusiveDays(currentCycle.startDate, currentCycle.endDate);
-  const dailyFoodQuota = roundMoney(settlement.food.budgetAvailable / totalCycleDays);
+  const dailyFoodQuota = settlement.food.recommendedMaxDailySpending;
   const todayDateKey = toLocalDateKey(new Date());
 
   const dailyFoodData = useMemo(() => {
@@ -282,169 +275,7 @@ export function DashboardPage() {
       ),
     [dailyFoodData]
   );
-  const dailyChartDomainMax = Math.max(Math.ceil((dailyChartPeak * 1.15) / dailyChartYZoom), 1);
-  const dailyChartWidth = `${Math.max(dailyChartXZoom * 100, 100)}%`;
-
-  function clampZoom(value: number, min: number, max: number) {
-    return Math.min(max, Math.max(min, Number(value.toFixed(2))));
-  }
-
-  function adjustDailyChartXZoom(delta: number) {
-    setDailyChartXZoom((current) => clampZoom(current + delta, 0.2, 4));
-  }
-
-  function adjustDailyChartYZoom(delta: number) {
-    setDailyChartYZoom((current) => clampZoom(current + delta, 1, 4));
-  }
-
-  function handleDailyChartWheel(axis: "x" | "y", delta: number) {
-    if (axis === "x") {
-      adjustDailyChartXZoom(delta > 0 ? -0.2 : 0.2);
-      return;
-    }
-
-    adjustDailyChartYZoom(delta > 0 ? -0.2 : 0.2);
-  }
-
-  function resolveDailyChartAxisFromPoint(clientX: number, clientY: number, rect: DOMRect) {
-    const localX = clientX - rect.left;
-    const localY = clientY - rect.top;
-
-    if (localX <= 56) return "y" as const;
-    if (localY >= rect.height - 40) return "x" as const;
-    return null;
-  }
-
-  function handleDailyChartWheelEvent(event: React.WheelEvent<HTMLDivElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const axis = resolveDailyChartAxisFromPoint(event.clientX, event.clientY, rect);
-    if (!axis) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    handleDailyChartWheel(axis, event.deltaY);
-  }
-
-  function handleDailyChartNativeWheel(event: WheelEvent, element: HTMLDivElement) {
-    const rect = element.getBoundingClientRect();
-    const axis = resolveDailyChartAxisFromPoint(event.clientX, event.clientY, rect);
-    if (!axis) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    handleDailyChartWheel(axis, event.deltaY);
-  }
-
-  useEffect(() => {
-    const interactionElement = dailyChartInteractionRef.current;
-    const scrollElement = dailyChartScrollRef.current;
-    if (!interactionElement && !scrollElement) return;
-
-    const interactionListener = (event: WheelEvent) => {
-      if (!interactionElement) return;
-      handleDailyChartNativeWheel(event, interactionElement);
-    };
-    const scrollListener = (event: WheelEvent) => {
-      if (!interactionElement) return;
-      handleDailyChartNativeWheel(event, interactionElement);
-    };
-
-    interactionElement?.addEventListener("wheel", interactionListener, { passive: false });
-    scrollElement?.addEventListener("wheel", scrollListener, { passive: false });
-    return () => {
-      interactionElement?.removeEventListener("wheel", interactionListener);
-      scrollElement?.removeEventListener("wheel", scrollListener);
-    };
-  }, []);
-
-  function handleDailyChartTouchStart(event: React.TouchEvent<HTMLDivElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const first = event.touches[0];
-    if (!first) return;
-    const axis = resolveDailyChartAxisFromPoint(first.clientX, first.clientY, rect);
-    if (!axis) {
-      dailyChartTouchRef.current = null;
-      return;
-    }
-
-    if (event.touches.length >= 2) {
-      const second = event.touches[1];
-      const pinchDistance = axis === "x" ? Math.abs(second.clientX - first.clientX) : Math.abs(second.clientY - first.clientY);
-      dailyChartTouchRef.current = { axis, lastX: first.clientX, lastY: first.clientY, pinchDistance };
-      return;
-    }
-
-    const touch = event.touches[0];
-    if (!touch) return;
-    dailyChartTouchRef.current = { axis, lastX: touch.clientX, lastY: touch.clientY, pinchDistance: null };
-  }
-
-  function handleDailyChartTouchMove(event: React.TouchEvent<HTMLDivElement>) {
-    const state = dailyChartTouchRef.current;
-    if (!state) return;
-    const axis = state.axis;
-
-    if (event.touches.length >= 2) {
-      event.preventDefault();
-      const first = event.touches[0];
-      const second = event.touches[1];
-      const nextDistance = axis === "x" ? Math.abs(second.clientX - first.clientX) : Math.abs(second.clientY - first.clientY);
-      const previousDistance = state.pinchDistance ?? nextDistance;
-      const delta = nextDistance - previousDistance;
-
-      if (axis === "x") {
-        adjustDailyChartXZoom(delta / 120);
-      } else {
-        adjustDailyChartYZoom(delta / 120);
-      }
-
-      dailyChartTouchRef.current = { ...state, pinchDistance: nextDistance };
-      return;
-    }
-
-    const touch = event.touches[0];
-    if (!touch) return;
-    event.preventDefault();
-    const delta = axis === "x" ? touch.clientX - state.lastX : touch.clientY - state.lastY;
-
-    if (axis === "x") {
-      adjustDailyChartXZoom(delta / 120);
-    } else {
-      adjustDailyChartYZoom(-delta / 120);
-    }
-
-    dailyChartTouchRef.current = { ...state, lastX: touch.clientX, lastY: touch.clientY };
-  }
-
-  function handleDailyChartTouchEnd() {
-    dailyChartTouchRef.current = null;
-  }
-
-  function handleDailyChartPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    const container = dailyChartScrollRef.current;
-    if (!container) return;
-    dailyChartDragRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      scrollLeft: container.scrollLeft
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function handleDailyChartPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    const container = dailyChartScrollRef.current;
-    const dragState = dailyChartDragRef.current;
-    if (!container || !dragState || dragState.pointerId !== event.pointerId) return;
-    container.scrollLeft = dragState.scrollLeft - (event.clientX - dragState.startX);
-  }
-
-  function handleDailyChartPointerEnd(event: React.PointerEvent<HTMLDivElement>) {
-    if (dailyChartDragRef.current?.pointerId !== event.pointerId) return;
-    dailyChartDragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }
+  const dailyChartDomainMax = Math.max(Math.ceil(dailyChartPeak * 1.15), 1);
 
   const copy =
     locale === "th"
@@ -463,20 +294,18 @@ export function DashboardPage() {
           itemPayer: "คนจ่าย",
           paidAhead: "จ่ายก่อน",
           noFoodTransactions: "ยังไม่มีรายการอาหารในรอบนี้",
-          dailyQuotaChart: "โควต้าอาหารรายวัน",
+          dailyQuotaChart: "กราฟสรุปทั้งเดือน",
           dailyQuotaHint: "เทียบโควต้าต่อวันกับค่าอาหารที่ใช้จริง เพื่อดูว่าวันไหนกินต่ำหรือเกินงบ",
           dailySpentSeries: "ใช้จริง",
           dailyQuotaSeries: "เส้นโควต้า",
           dailyAverageSeries: "เส้นเฉลี่ยค่ากิน",
           overBudget: "เกินโควต้า",
           underBudget: "ต่ำกว่าโควต้า",
-          overBudgetHighlight: "สีส้มแดง = วันเกินโควต้า",
           monthlyExpenses: "ค่าใช้จ่ายรายเดือน",
           monthlyExpensesHint: "แยกค่าอาหารและค่าใช้จ่ายอื่นของแต่ละเดือน",
           monthlyFood: "ค่าอาหาร",
           monthlyOther: "ค่าใช้จ่ายอื่น",
           categoryMixTitle: "สัดส่วนค่าใช้จ่าย",
-          todayVsQuota: `ใช้ไป ${formatTHB(todayFoodSpent)} จากโควต้า ${formatTHB(dailyFoodQuota)}`,
           latestTransactions: "รายการล่าสุด"
         }
       : {
@@ -494,20 +323,18 @@ export function DashboardPage() {
           itemPayer: "Payer",
           paidAhead: "paid ahead",
           noFoodTransactions: "No food transactions in this cycle",
-          dailyQuotaChart: "Daily food quota",
+          dailyQuotaChart: "Monthly summary chart",
           dailyQuotaHint: "Compare each day's food quota with actual spending to spot days that run under or over budget.",
           dailySpentSeries: "Spent",
           dailyQuotaSeries: "Quota line",
           dailyAverageSeries: "Food average line",
           overBudget: "Over quota",
           underBudget: "Under quota",
-          overBudgetHighlight: "Orange-red bars mark days that go over quota",
           monthlyExpenses: "Monthly expenses",
           monthlyExpensesHint: "Food and other expenses split by month",
           monthlyFood: "Food",
           monthlyOther: "Other",
           categoryMixTitle: "Category mix",
-          todayVsQuota: `Spent ${formatTHB(todayFoodSpent)} out of ${formatTHB(dailyFoodQuota)} today`,
           latestTransactions: "Latest transactions"
         };
 
@@ -521,6 +348,17 @@ export function DashboardPage() {
   const installmentListTitle = locale === "th" ? "รายการผ่อนรอบนี้" : "Installments this cycle";
   const installmentTotalLabel = locale === "th" ? "ยอดรวมผ่อนรอบนี้" : "Total installments this cycle";
   const noInstallmentTransactions = locale === "th" ? "ยังไม่มีรายการผ่อนในรอบนี้" : "No installments in this cycle";
+  const summaryCards: Array<{
+    label: string;
+    value: string;
+    icon: typeof TrendingDown;
+    interactive?: "food" | "other" | "installment";
+  }> = [
+    { label: copy.foodSpentLabel, value: formatTHB(settlement.food.spent), icon: TrendingDown, interactive: "food" },
+    { label: copy.otherSpentLabel, value: formatTHB(otherExpenseTotal), icon: Wallet, interactive: "other" },
+    { label: installmentCardLabel, value: `${installmentTransactions.length} ${t(locale, "items")}`, icon: Wallet, interactive: "installment" },
+    { label: copy.averageDailyFoodLabel, value: formatTHB(settlement.food.averageDailySpending), icon: CalendarDays }
+  ];
   const detailTransactions =
     detailsModalType === "food"
       ? foodTransactions
@@ -562,7 +400,11 @@ export function DashboardPage() {
       grouped.set(transaction.date, [transaction]);
     }
 
-    return Array.from(grouped.entries()).map(([date, items]) => ({ date, items }));
+    return Array.from(grouped.entries()).map(([date, items]) => ({
+      date,
+      items,
+      totalAmount: roundMoney(items.reduce((sum, transaction) => sum + transaction.amount, 0))
+    }));
   }, [detailTransactions]);
 
   return (
@@ -572,31 +414,43 @@ export function DashboardPage() {
           <Card className="overflow-hidden bg-slate-950 p-0 text-white dark:bg-white/[0.08]">
             <div className="relative p-6 sm:p-8">
               <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-teal-400/20 blur-3xl" />
-              <Badge className="bg-teal-300/15 text-teal-200">{t(locale, "sharedFoodWallet")}</Badge>
-              <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
-                <div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <Badge className="w-fit bg-teal-300/15 text-teal-200">{t(locale, "sharedFoodWallet")}</Badge>
+                <div className="sm:text-right">
                   <p className="text-sm text-slate-300">{t(locale, "remainingBudget")}</p>
                   <h1 className="mt-2 text-4xl font-black tracking-normal sm:text-5xl">
                     {formatTHB(settlement.food.remaining)}
                   </h1>
-                  <p className="mt-3 text-sm text-slate-300">
-                    {t(locale, "walletHolder")}: {users.find((user) => user.id === currentCycle.foodWalletHolderUserId)?.displayName}
+                </div>
+              </div>
+              <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
+                <div>
+                  <p className="text-xs text-slate-400">
+                    {users.find((user) => user.id === currentCycle.foodWalletHolderUserId)?.displayName}
                     {" · "}
                     {formatShortDate(currentCycle.startDate)} - {formatShortDate(currentCycle.endDate)}
                   </p>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                  <div className="rounded-2xl bg-white/10 p-4">
-                    <p className="text-sm text-slate-300">{copy.todayQuotaLabel}</p>
-                    <p className="mt-1 text-2xl font-bold">{formatTHB(dailyFoodQuota)}</p>
-                    <p className="mt-1 text-xs text-slate-400">{settlement.food.remainingDays} {t(locale, "daysLeft")}</p>
+                <div className="grid gap-2.5 sm:grid-cols-2 lg:w-[220px] lg:grid-cols-1">
+                  <div className="rounded-2xl bg-white/10 px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-300">{copy.todayQuotaLabel}</p>
+                        <p className="mt-1 text-xl font-bold">{formatTHB(dailyFoodQuota)}</p>
+                      </div>
+                      <p className="shrink-0 pt-0.5 text-[11px] text-slate-400">{settlement.food.remainingDays} {t(locale, "daysLeft")}</p>
+                    </div>
                   </div>
-                  <div className="rounded-2xl bg-white/10 p-4">
-                    <p className="text-sm text-slate-300">{copy.todayFoodLabel}</p>
-                    <p className="mt-1 text-2xl font-bold">{formatTHB(todayFoodSpent)}</p>
-                    <p className={`mt-1 text-xs ${todayFoodDelta > 0 ? "text-rose-200" : "text-emerald-200"}`}>
-                      {todayFoodDelta > 0 ? copy.overBudget : copy.underBudget} {formatTHB(Math.abs(todayFoodDelta))}
-                    </p>
+                  <div className="rounded-2xl bg-white/10 px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-300">{copy.todayFoodLabel}</p>
+                        <p className="mt-1 text-xl font-bold">{formatTHB(todayFoodSpent)}</p>
+                      </div>
+                      <p className={`shrink-0 pt-0.5 text-[11px] ${todayFoodDelta > 0 ? "text-rose-200" : "text-emerald-200"}`}>
+                        {todayFoodDelta > 0 ? copy.overBudget : copy.underBudget} {formatTHB(Math.abs(todayFoodDelta))}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -605,37 +459,30 @@ export function DashboardPage() {
         </motion.div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          { label: copy.foodSpentLabel, value: formatTHB(settlement.food.spent), icon: TrendingDown, interactive: "food" as const, hint: copy.foodExpenseHint },
-          { label: copy.otherSpentLabel, value: formatTHB(otherExpenseTotal), icon: Wallet, interactive: "other" as const, hint: otherExpenseHint },
-          { label: installmentCardLabel, value: `${installmentTransactions.length} ${t(locale, "items")}`, icon: Wallet, interactive: "installment" as const, hint: installmentCardHint },
-          { label: copy.todayFoodLabel, value: `${formatTHB(todayFoodSpent)} / ${formatTHB(dailyFoodQuota)}`, icon: CalendarDays, hint: copy.todayVsQuota },
-          { label: copy.averageDailyFoodLabel, value: formatTHB(settlement.food.averageDailySpending), icon: CalendarDays }
-        ].map((item) => {
+      <section className="grid grid-cols-2 gap-3 sm:gap-4">
+        {summaryCards.map((item) => {
           const Icon = item.icon;
-          if (item.interactive) {
+          const interactiveType = item.interactive;
+          if (interactiveType) {
             return (
-              <button key={item.label} type="button" className="text-left" onClick={() => setDetailsModalType((current) => (current === item.interactive ? null : item.interactive))}>
-                <Card className="h-full transition hover:-translate-y-0.5 hover:shadow-lg">
+              <button key={item.label} type="button" className="min-w-0 text-left" onClick={() => setDetailsModalType((current) => (current === interactiveType ? null : interactiveType))}>
+                <Card className="h-full min-w-0 p-4 transition hover:-translate-y-0.5 hover:shadow-lg sm:p-5">
                   <div className="flex items-start justify-between gap-3">
                     <Icon className="h-5 w-5 text-teal-600 dark:text-teal-300" />
-                    <ChevronDown className={`h-5 w-5 text-slate-400 transition ${detailsModalType === item.interactive ? "rotate-180" : ""}`} />
+                    <ChevronDown className={`h-5 w-5 text-slate-400 transition ${detailsModalType === interactiveType ? "rotate-180" : ""}`} />
                   </div>
-                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{item.label}</p>
-                  <p className="mt-1 text-2xl font-bold">{item.value}</p>
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{item.hint}</p>
+                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{item.label}</p>
+                  <p className="mt-1 text-xl font-bold sm:text-2xl">{item.value}</p>
                 </Card>
               </button>
             );
           }
 
           return (
-            <Card key={item.label}>
+            <Card key={item.label} className="min-w-0 p-4 sm:p-5">
               <Icon className="h-5 w-5 text-teal-600 dark:text-teal-300" />
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{item.label}</p>
-              <p className="mt-1 text-2xl font-bold">{item.value}</p>
-              {item.hint ? <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{item.hint}</p> : null}
+              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{item.label}</p>
+              <p className="mt-1 text-xl font-bold sm:text-2xl">{item.value}</p>
             </Card>
           );
         })}
@@ -647,7 +494,6 @@ export function DashboardPage() {
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">
               <div>
                 <h2 className="text-lg font-bold">{detailTitle}</h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{detailHint}</p>
               </div>
               <div className="flex items-center gap-3">
                 <Badge>{detailTransactions.length} {t(locale, "items")}</Badge>
@@ -721,26 +567,26 @@ export function DashboardPage() {
                     );
                   })}
                 </div>
-                <div className="space-y-4 p-4 md:hidden">
+                <div className="space-y-2.5 p-3 md:hidden">
                   {detailTransactionGroups.map((group) => (
-                    <div key={group.date} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
-                      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-white/10">
+                    <div key={group.date} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2 dark:border-white/10">
                         <div className="min-w-0">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{copy.itemDate}</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">{formatShortDate(group.date)}</p>
+                          <p className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">{formatShortDate(group.date)}</p>
                         </div>
-                        <Badge>{group.items.length} {t(locale, "items")}</Badge>
+                        <Badge>{group.items.length} {t(locale, "items")} · {formatTHB(group.totalAmount)}</Badge>
                       </div>
 
-                      <div className="mt-3 space-y-3">
+                      <div className="mt-2 space-y-2">
                         {group.items.map((transaction) => {
                           const payer = users.find((user) => user.id === transaction.payerUserId);
                           const paidAhead = detailsModalType === "food" && transaction.payerUserId !== currentCycle.foodWalletHolderUserId;
                           const installmentProgress = detailsModalType === "installment" ? parseInstallmentProgress(transaction.title) : null;
 
                           return (
-                            <div key={transaction.id} className="rounded-2xl bg-white px-4 py-3 shadow-sm dark:bg-white/[0.04]">
-                              <div className="flex items-start justify-between gap-3">
+                            <div key={transaction.id} className="rounded-2xl bg-white px-3 py-2.5 shadow-sm dark:bg-white/[0.04]">
+                              <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                   <p
                                     className="text-sm font-semibold text-slate-950 dark:text-white"
@@ -754,12 +600,12 @@ export function DashboardPage() {
                                     {installmentProgress ? installmentProgress.baseTitle : transaction.title}
                                   </p>
                                   {installmentProgress ? (
-                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{formatInstallmentProgressLabel(locale, transaction.title)}</p>
+                                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{formatInstallmentProgressLabel(locale, transaction.title)}</p>
                                   ) : null}
                                 </div>
                                 <p className="shrink-0 text-right text-base font-bold text-slate-950 dark:text-white">{formatTHB(transaction.amount)}</p>
                               </div>
-                              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200">
                                 <span>{payer?.displayName ?? "-"}</span>
                                 {paidAhead ? (
                                   <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
@@ -785,62 +631,52 @@ export function DashboardPage() {
       ) : null}
 
       <section>
-        <Card className="min-h-80 min-w-0 overflow-hidden">
-          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
-            <div>
-              <h2 className="text-lg font-bold">{copy.dailyQuotaChart}</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.dailyQuotaHint}</p>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
-              <span className="flex items-center gap-2">
-                <span className="h-0.5 w-5 rounded-full bg-slate-400" />
-                {copy.dailyQuotaSeries}
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-teal-500" />
-                {copy.dailySpentSeries}
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-orange-500" />
-                {copy.overBudgetHighlight}
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="h-0.5 w-5 rounded-full bg-cyan-500" />
-                {copy.dailyAverageSeries}
-              </span>
+        <Card className="min-w-0 overflow-hidden p-0">
+          <div className="border-b border-slate-200/80 px-5 py-5 dark:border-white/10 sm:px-6">
+            <div className="max-w-2xl">
+              <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">{copy.dailyQuotaChart}</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">{copy.dailyQuotaHint}</p>
             </div>
           </div>
-          <div
-            ref={dailyChartInteractionRef}
-            className="mt-4 h-72 min-w-0"
-            onWheel={handleDailyChartWheelEvent}
-            onTouchStart={handleDailyChartTouchStart}
-            onTouchMove={handleDailyChartTouchMove}
-            onTouchEnd={handleDailyChartTouchEnd}
-            style={{ touchAction: "none" }}
-          >
-            <div
-              ref={dailyChartScrollRef}
-              className="h-full min-w-0 overflow-x-auto overflow-y-hidden rounded-2xl cursor-grab active:cursor-grabbing"
-              onPointerDown={handleDailyChartPointerDown}
-              onPointerMove={handleDailyChartPointerMove}
-              onPointerUp={handleDailyChartPointerEnd}
-              onPointerCancel={handleDailyChartPointerEnd}
-            >
-              <div style={{ width: dailyChartWidth, height: "100%" }}>
+
+          <div className="px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
+            <div className="rounded-[28px] border border-slate-200/80 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.04] sm:p-4">
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200/80 pb-3 dark:border-white/10">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:bg-white/10 dark:text-slate-200">
+                  <span className="h-0.5 w-5 rounded-full bg-slate-400" />
+                  {copy.dailyQuotaSeries}
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:bg-white/10 dark:text-slate-200">
+                  <span className="h-0.5 w-5 rounded-full bg-teal-500" />
+                  {copy.dailySpentSeries}
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:bg-white/10 dark:text-slate-200">
+                  <span className="h-0.5 w-5 rounded-full bg-cyan-500" />
+                  {copy.dailyAverageSeries}
+                </span>
+              </div>
+
+              <div className="mt-3 h-[170px] min-w-0 sm:h-[190px]">
                 {chartsReady ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={dailyFoodData} barCategoryGap={10}>
-                      <XAxis dataKey="day" axisLine={false} tickLine={false} minTickGap={0} />
+                    <LineChart data={dailyFoodData} margin={{ top: 4, right: 6, left: -18, bottom: 0 }}>
+                      <XAxis dataKey="day" axisLine={false} tickLine={false} minTickGap={20} tickMargin={8} />
                       <YAxis
                         axisLine={false}
                         tickLine={false}
                         allowDataOverflow
                         domain={[0, dailyChartDomainMax]}
                         tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
+                        tickMargin={8}
                       />
                       <Tooltip
-                        cursor={false}
+                        cursor={{ stroke: "#cbd5e1", strokeDasharray: "4 4" }}
+                        contentStyle={{
+                          borderRadius: "18px",
+                          border: "1px solid rgba(148, 163, 184, 0.2)",
+                          background: "rgba(15, 23, 42, 0.92)",
+                          color: "#f8fafc"
+                        }}
                         formatter={(value, name, entry) => {
                           if (name === "quota") return [formatTHB(Number(value ?? 0)), copy.dailyQuotaSeries];
                           if (name === "average") return [formatTHB(Number(value ?? 0)), copy.dailyAverageSeries];
@@ -850,14 +686,10 @@ export function DashboardPage() {
                         }}
                         labelFormatter={(label) => `${copy.dailyQuotaChart}: ${label}`}
                       />
-                      <Line type="monotone" dataKey="quota" stroke="#94a3b8" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} name="quota" />
-                      <Line type="monotone" dataKey="average" stroke="#06b6d4" strokeWidth={2.5} strokeDasharray="6 6" dot={false} activeDot={{ r: 4 }} name="average" />
-                      <Bar dataKey="spent" radius={[8, 8, 0, 0]} name="spent">
-                        {dailyFoodData.map((entry) => (
-                          <Cell key={entry.dateKey} fill={entry.delta > 0 ? "#f97316" : "#14b8a6"} />
-                        ))}
-                      </Bar>
-                    </ComposedChart>
+                      <Line type="monotone" dataKey="spent" stroke="#14b8a6" strokeWidth={3.5} dot={false} activeDot={{ r: 5, strokeWidth: 0 }} name="spent" />
+                      <Line type="monotone" dataKey="quota" stroke="#94a3b8" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} name="quota" />
+                      <Line type="monotone" dataKey="average" stroke="#06b6d4" strokeWidth={2.5} strokeDasharray="6 6" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} name="average" />
+                    </LineChart>
                   </ResponsiveContainer>
                 ) : null}
               </div>
@@ -950,7 +782,7 @@ export function DashboardPage() {
         </Card>
       </section>
 
-      <section className="grid min-w-0 gap-4 lg:grid-cols-[1fr_0.9fr]">
+      <section>
         <Card className="min-w-0 overflow-hidden">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold">{copy.latestTransactions}</h2>
@@ -971,31 +803,6 @@ export function DashboardPage() {
               </div>
             ))}
           </div>
-        </Card>
-
-        <Card className="min-w-0">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
-              <PieChartIcon className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{copy.todayFoodLabel}</p>
-              <p className="text-xl font-bold">{copy.todayVsQuota}</p>
-            </div>
-          </div>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-white/5">
-              <p className="text-sm text-slate-500 dark:text-slate-400">{copy.todayQuotaLabel}</p>
-              <p className="mt-1 text-2xl font-black">{formatTHB(dailyFoodQuota)}</p>
-            </div>
-            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-white/5">
-              <p className="text-sm text-slate-500 dark:text-slate-400">{copy.todayFoodLabel}</p>
-              <p className="mt-1 text-2xl font-black">{formatTHB(todayFoodSpent)}</p>
-            </div>
-          </div>
-          <p className={`mt-4 text-sm font-semibold ${todayFoodDelta > 0 ? "text-rose-500" : "text-emerald-600 dark:text-emerald-300"}`}>
-            {todayFoodDelta > 0 ? copy.overBudget : copy.underBudget} {formatTHB(Math.abs(todayFoodDelta))}
-          </p>
         </Card>
       </section>
     </div>
