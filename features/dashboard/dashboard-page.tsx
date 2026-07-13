@@ -20,6 +20,15 @@ import { formatTHB, roundMoney } from "@/utils/currency";
 import { formatShortDate } from "@/utils/date";
 import { formatInstallmentProgressLabel, parseInstallmentProgress } from "@/utils/installments";
 
+const mutedTextClass = "text-[var(--text-muted)]";
+const softTextClass = "text-[var(--text-soft)]";
+const accentTextClass = "text-[var(--accent-fg)]";
+const accentSoftBgClass = "bg-[var(--accent-soft)]";
+const overlayClass = "bg-[var(--overlay)]";
+const panelSoftClass = "bg-[var(--panel-soft-bg)]";
+const rowSurfaceClass = "bg-[var(--row-surface)]";
+const statusWarnClass = "bg-[var(--status-warn-bg)] text-[var(--status-warn-fg)]";
+
 function toLocalDateKey(value: Date) {
   const year = value.getFullYear();
   const month = String(value.getMonth() + 1).padStart(2, "0");
@@ -167,17 +176,17 @@ export function DashboardPage() {
         {
           name: getCategoryLabel(locale, "food"),
           value: foodTransactions.reduce((sum, item) => sum + item.amount, 0),
-          color: "#14b8a6"
+          color: "var(--chart-spent)"
         },
         {
           name: t(locale, "typeNormal"),
           value: transactions.filter((item) => item.transactionType === "normal").reduce((sum, item) => sum + item.amount, 0),
-          color: "#0f766e"
+          color: "var(--accent-fg)"
         },
         {
           name: t(locale, "typeInstallment"),
           value: transactions.filter((item) => item.transactionType === "installment").reduce((sum, item) => sum + item.amount, 0),
-          color: "#cbd5e1"
+          color: "var(--chart-other)"
         }
       ].filter((item) => item.value > 0),
     [foodTransactions, locale, transactions]
@@ -340,11 +349,9 @@ export function DashboardPage() {
 
   const MonthlySummaryIcon = monthlySummaryLink.icon;
   const otherExpenseListTitle = locale === "th" ? "รายการค่าใช้จ่ายอื่นรอบนี้" : "Other transactions this cycle";
-  const otherExpenseHint = locale === "th" ? "กดการ์ดเพื่อดูรายการค่าใช้จ่ายอื่นทั้งหมดของรอบนี้" : "Tap the card to see all other transactions in this cycle.";
   const otherExpenseTotalLabel = locale === "th" ? "ยอดรวมค่าใช้จ่ายอื่นรอบนี้" : "Total other spending this cycle";
   const noOtherTransactions = locale === "th" ? "ยังไม่มีรายการค่าใช้จ่ายอื่นในรอบนี้" : "No other transactions in this cycle";
   const installmentCardLabel = locale === "th" ? "รายการผ่อนเดือนนี้" : "Installments this cycle";
-  const installmentCardHint = locale === "th" ? "กดการ์ดเพื่อดูรายการผ่อนของรอบบิลนี้ทั้งหมด" : "Tap the card to see all installment items in this billing cycle.";
   const installmentListTitle = locale === "th" ? "รายการผ่อนรอบนี้" : "Installments this cycle";
   const installmentTotalLabel = locale === "th" ? "ยอดรวมผ่อนรอบนี้" : "Total installments this cycle";
   const noInstallmentTransactions = locale === "th" ? "ยังไม่มีรายการผ่อนในรอบนี้" : "No installments in this cycle";
@@ -371,12 +378,6 @@ export function DashboardPage() {
       : detailsModalType === "other"
         ? otherExpenseListTitle
         : installmentListTitle;
-  const detailHint =
-    detailsModalType === "food"
-      ? copy.foodExpenseHint
-      : detailsModalType === "other"
-        ? otherExpenseHint
-        : installmentCardHint;
   const detailTotalLabel =
     detailsModalType === "food"
       ? copy.foodTotal
@@ -411,13 +412,13 @@ export function DashboardPage() {
     <div className="space-y-6">
       <section>
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="overflow-hidden bg-slate-950 p-0 text-white dark:bg-white/[0.08]">
+          <Card className="overflow-hidden border-transparent p-0 text-[var(--hero-fg)]" style={{ background: "var(--hero-surface)" }}>
             <div className="relative p-6 sm:p-8">
-              <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-teal-400/20 blur-3xl" />
+              <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-[var(--hero-accent)] blur-3xl" />
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <Badge className="w-fit bg-teal-300/15 text-teal-200">{t(locale, "sharedFoodWallet")}</Badge>
+                <Badge className="w-fit bg-[var(--hero-badge-bg)] text-[var(--hero-badge-fg)]">{t(locale, "sharedFoodWallet")}</Badge>
                 <div className="sm:text-right">
-                  <p className="text-sm text-slate-300">{t(locale, "remainingBudget")}</p>
+                  <p className="text-sm text-[var(--hero-muted)]">{t(locale, "remainingBudget")}</p>
                   <h1 className="mt-2 text-4xl font-black tracking-normal sm:text-5xl">
                     {formatTHB(settlement.food.remaining)}
                   </h1>
@@ -425,29 +426,29 @@ export function DashboardPage() {
               </div>
               <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
                 <div>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[var(--hero-soft)]">
                     {users.find((user) => user.id === currentCycle.foodWalletHolderUserId)?.displayName}
                     {" · "}
                     {formatShortDate(currentCycle.startDate)} - {formatShortDate(currentCycle.endDate)}
                   </p>
                 </div>
                 <div className="grid gap-2.5 sm:grid-cols-2 lg:w-[220px] lg:grid-cols-1">
-                  <div className="rounded-2xl bg-white/10 px-4 py-3">
+                  <div className="rounded-2xl bg-[var(--hero-panel-bg)] px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-300">{copy.todayQuotaLabel}</p>
+                        <p className="text-xs font-medium text-[var(--hero-muted)]">{copy.todayQuotaLabel}</p>
                         <p className="mt-1 text-xl font-bold">{formatTHB(dailyFoodQuota)}</p>
                       </div>
-                      <p className="shrink-0 pt-0.5 text-[11px] text-slate-400">{settlement.food.remainingDays} {t(locale, "daysLeft")}</p>
+                      <p className="shrink-0 pt-0.5 text-[11px] text-[var(--hero-soft)]">{settlement.food.remainingDays} {t(locale, "daysLeft")}</p>
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-white/10 px-4 py-3">
+                  <div className="rounded-2xl bg-[var(--hero-panel-bg)] px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-300">{copy.todayFoodLabel}</p>
+                        <p className="text-xs font-medium text-[var(--hero-muted)]">{copy.todayFoodLabel}</p>
                         <p className="mt-1 text-xl font-bold">{formatTHB(todayFoodSpent)}</p>
                       </div>
-                      <p className={`shrink-0 pt-0.5 text-[11px] ${todayFoodDelta > 0 ? "text-rose-200" : "text-emerald-200"}`}>
+                      <p className="shrink-0 pt-0.5 text-[11px] text-[var(--hero-muted)]">
                         {todayFoodDelta > 0 ? copy.overBudget : copy.underBudget} {formatTHB(Math.abs(todayFoodDelta))}
                       </p>
                     </div>
@@ -468,10 +469,10 @@ export function DashboardPage() {
               <button key={item.label} type="button" className="min-w-0 text-left" onClick={() => setDetailsModalType((current) => (current === interactiveType ? null : interactiveType))}>
                 <Card className="h-full min-w-0 p-4 transition hover:-translate-y-0.5 hover:shadow-lg sm:p-5">
                   <div className="flex items-start justify-between gap-3">
-                    <Icon className="h-5 w-5 text-teal-600 dark:text-teal-300" />
-                    <ChevronDown className={`h-5 w-5 text-slate-400 transition ${detailsModalType === interactiveType ? "rotate-180" : ""}`} />
+                    <Icon className="h-5 w-5 text-[var(--accent-fg)]" />
+                    <ChevronDown className={detailsModalType === interactiveType ? "h-5 w-5 rotate-180 text-[var(--text-muted)] transition" : "h-5 w-5 text-[var(--text-muted)] transition"} />
                   </div>
-                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{item.label}</p>
+                  <p className={["mt-3 text-sm", mutedTextClass].join(" ")}>{item.label}</p>
                   <p className="mt-1 text-xl font-bold sm:text-2xl">{item.value}</p>
                 </Card>
               </button>
@@ -480,8 +481,8 @@ export function DashboardPage() {
 
           return (
             <Card key={item.label} className="min-w-0 p-4 sm:p-5">
-              <Icon className="h-5 w-5 text-teal-600 dark:text-teal-300" />
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{item.label}</p>
+              <Icon className="h-5 w-5 text-[var(--accent-fg)]" />
+              <p className={["mt-3 text-sm", mutedTextClass].join(" ")}>{item.label}</p>
               <p className="mt-1 text-xl font-bold sm:text-2xl">{item.value}</p>
             </Card>
           );
@@ -489,9 +490,9 @@ export function DashboardPage() {
       </section>
 
       {detailsModalType ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-4" onClick={() => setDetailsModalType(null)}>
+        <div className={["fixed inset-0 z-50 flex items-center justify-center p-3 backdrop-blur-sm sm:p-4", overlayClass].join(" ")} onClick={() => setDetailsModalType(null)}>
           <Card className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden p-0" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-white/10">
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4">
               <div>
                 <h2 className="text-lg font-bold">{detailTitle}</h2>
               </div>
@@ -501,7 +502,7 @@ export function DashboardPage() {
                   type="button"
                   aria-label="Close"
                   onClick={() => setDetailsModalType(null)}
-                  className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
+                  className="rounded-full p-2 text-[var(--text-muted)] transition hover:bg-[var(--ghost-hover)] hover:text-[var(--app-fg)]"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -511,23 +512,23 @@ export function DashboardPage() {
             {detailTransactions.length ? (
               <div className="overflow-y-auto overscroll-contain">
                 <div
-                  className={`grid gap-3 border-b border-slate-200 px-5 py-4 dark:border-white/10 ${
+                  className={`grid gap-3 border-b border-[var(--border)] px-5 py-4 ${
                     detailsModalType === "food" ? "sm:grid-cols-2" : "sm:grid-cols-1"
                   }`}
                 >
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{detailTotalLabel}</p>
-                    <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{formatTHB(detailTotalValue)}</p>
+                  <div className={["rounded-2xl px-4 py-3", panelSoftClass].join(" ")}>
+                    <p className={["text-xs font-semibold uppercase tracking-wide", mutedTextClass].join(" ")}>{detailTotalLabel}</p>
+                    <p className="mt-2 text-2xl font-black">{formatTHB(detailTotalValue)}</p>
                   </div>
                   {detailSummaryLabel && detailSummaryValue !== null ? (
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3 dark:bg-white/5">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{detailSummaryLabel}</p>
-                      <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{formatTHB(detailSummaryValue)}</p>
+                    <div className={["rounded-2xl px-4 py-3", panelSoftClass].join(" ")}>
+                      <p className={["text-xs font-semibold uppercase tracking-wide", mutedTextClass].join(" ")}>{detailSummaryLabel}</p>
+                      <p className="mt-2 text-2xl font-black">{formatTHB(detailSummaryValue)}</p>
                     </div>
                   ) : null}
                 </div>
                 <div className="hidden md:block">
-                  <div className="grid grid-cols-[92px_minmax(0,1fr)_110px_220px] gap-3 bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                  <div className={["grid grid-cols-[92px_minmax(0,1fr)_110px_220px] gap-3 px-5 py-3 text-xs font-bold uppercase tracking-wide", panelSoftClass, mutedTextClass].join(" ")}>
                     <span>{copy.itemDate}</span>
                     <span>{copy.itemTitle}</span>
                     <span className="text-right">{copy.itemAmount}</span>
@@ -541,15 +542,15 @@ export function DashboardPage() {
                     return (
                       <div
                         key={transaction.id}
-                        className="grid grid-cols-[92px_minmax(0,1fr)_110px_220px] gap-3 border-t border-slate-200 px-5 py-3 text-sm dark:border-white/10"
+                        className="grid grid-cols-[92px_minmax(0,1fr)_110px_220px] gap-3 border-t border-[var(--border)] px-5 py-3 text-sm"
                       >
-                        <span className="text-slate-500 dark:text-slate-400">{formatShortDate(transaction.date)}</span>
+                        <span className={mutedTextClass}>{formatShortDate(transaction.date)}</span>
                         <span className="min-w-0">
                           <span className="block truncate font-semibold">
                             {installmentProgress ? installmentProgress.baseTitle : transaction.title}
                           </span>
                           {installmentProgress ? (
-                            <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">
+                            <span className={["mt-0.5 block text-xs", mutedTextClass].join(" ")}>
                               {formatInstallmentProgressLabel(locale, transaction.title)}
                             </span>
                           ) : null}
@@ -558,7 +559,7 @@ export function DashboardPage() {
                         <span className="flex min-w-0 items-center gap-2">
                           <span className="truncate">{payer?.displayName ?? "-"}</span>
                           {paidAhead ? (
-                            <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
+                            <span className={["rounded-full px-2 py-1 text-[11px] font-semibold", statusWarnClass].join(" ")}>
                               {(payer?.displayName ?? "-") + " " + copy.paidAhead}
                             </span>
                           ) : null}
@@ -569,11 +570,11 @@ export function DashboardPage() {
                 </div>
                 <div className="space-y-2.5 p-3 md:hidden">
                   {detailTransactionGroups.map((group) => (
-                    <div key={group.date} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
-                      <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2 dark:border-white/10">
+                    <div key={group.date} className={["rounded-2xl border border-[var(--border)] p-3", panelSoftClass].join(" ")}>
+                      <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] pb-2">
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{copy.itemDate}</p>
-                          <p className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">{formatShortDate(group.date)}</p>
+                          <p className={["text-xs font-semibold uppercase tracking-wide", mutedTextClass].join(" ")}>{copy.itemDate}</p>
+                          <p className="mt-0.5 text-sm font-semibold">{formatShortDate(group.date)}</p>
                         </div>
                         <Badge>{group.items.length} {t(locale, "items")} · {formatTHB(group.totalAmount)}</Badge>
                       </div>
@@ -585,11 +586,11 @@ export function DashboardPage() {
                           const installmentProgress = detailsModalType === "installment" ? parseInstallmentProgress(transaction.title) : null;
 
                           return (
-                            <div key={transaction.id} className="rounded-2xl bg-white px-3 py-2.5 shadow-sm dark:bg-white/[0.04]">
+                            <div key={transaction.id} className={["rounded-2xl px-3 py-2.5 shadow-sm", rowSurfaceClass].join(" ")}>
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                   <p
-                                    className="text-sm font-semibold text-slate-950 dark:text-white"
+                                    className="text-sm font-semibold"
                                     style={{
                                       display: "-webkit-box",
                                       WebkitBoxOrient: "vertical",
@@ -600,15 +601,15 @@ export function DashboardPage() {
                                     {installmentProgress ? installmentProgress.baseTitle : transaction.title}
                                   </p>
                                   {installmentProgress ? (
-                                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{formatInstallmentProgressLabel(locale, transaction.title)}</p>
+                                    <p className={["mt-0.5 text-xs", mutedTextClass].join(" ")}>{formatInstallmentProgressLabel(locale, transaction.title)}</p>
                                   ) : null}
                                 </div>
-                                <p className="shrink-0 text-right text-base font-bold text-slate-950 dark:text-white">{formatTHB(transaction.amount)}</p>
+                                <p className="shrink-0 text-right text-base font-bold">{formatTHB(transaction.amount)}</p>
                               </div>
-                              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-slate-700 dark:text-slate-200">
+                              <div className={["mt-2 flex flex-wrap items-center gap-1.5 text-sm", softTextClass].join(" ")}>
                                 <span>{payer?.displayName ?? "-"}</span>
                                 {paidAhead ? (
-                                  <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
+                                  <span className={["rounded-full px-2 py-1 text-[11px] font-semibold", statusWarnClass].join(" ")}>
                                     {(payer?.displayName ?? "-") + " " + copy.paidAhead}
                                   </span>
                                 ) : null}
@@ -622,7 +623,7 @@ export function DashboardPage() {
                 </div>
               </div>
             ) : (
-              <p className="px-5 py-4 text-sm text-slate-500 dark:text-slate-400">
+              <p className={["px-5 py-4 text-sm", mutedTextClass].join(" ")}>
                 {detailsModalType === "food" ? copy.noFoodTransactions : detailsModalType === "other" ? noOtherTransactions : noInstallmentTransactions}
               </p>
             )}
@@ -632,26 +633,26 @@ export function DashboardPage() {
 
       <section>
         <Card className="min-w-0 overflow-hidden p-0">
-          <div className="border-b border-slate-200/80 px-5 py-5 dark:border-white/10 sm:px-6">
+          <div className="border-b border-[var(--border)] px-5 py-5 sm:px-6">
             <div className="max-w-2xl">
-              <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">{copy.dailyQuotaChart}</h2>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">{copy.dailyQuotaHint}</p>
+              <h2 className="text-2xl font-black tracking-tight">{copy.dailyQuotaChart}</h2>
+              <p className={["mt-2 max-w-xl text-sm leading-relaxed", mutedTextClass].join(" ")}>{copy.dailyQuotaHint}</p>
             </div>
           </div>
 
           <div className="px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
-            <div className="rounded-[28px] border border-slate-200/80 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-white/[0.04] sm:p-4">
-              <div className="flex flex-wrap items-center gap-2 border-b border-slate-200/80 pb-3 dark:border-white/10">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:bg-white/10 dark:text-slate-200">
-                  <span className="h-0.5 w-5 rounded-full bg-slate-400" />
+            <div className={["rounded-[28px] border border-[var(--border)] p-3 sm:p-4", panelSoftClass].join(" ")}>
+              <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] pb-3">
+                <span className={["inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm", rowSurfaceClass, softTextClass].join(" ")}>
+                  <span className="h-0.5 w-5 rounded-full bg-[var(--chart-quota)]" />
                   {copy.dailyQuotaSeries}
                 </span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:bg-white/10 dark:text-slate-200">
-                  <span className="h-0.5 w-5 rounded-full bg-teal-500" />
+                <span className={["inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm", rowSurfaceClass, softTextClass].join(" ")}>
+                  <span className="h-0.5 w-5 rounded-full bg-[var(--chart-spent)]" />
                   {copy.dailySpentSeries}
                 </span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:bg-white/10 dark:text-slate-200">
-                  <span className="h-0.5 w-5 rounded-full bg-cyan-500" />
+                <span className={["inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm", rowSurfaceClass, softTextClass].join(" ")}>
+                  <span className="h-0.5 w-5 rounded-full bg-[var(--chart-average)]" />
                   {copy.dailyAverageSeries}
                 </span>
               </div>
@@ -670,12 +671,12 @@ export function DashboardPage() {
                         tickMargin={8}
                       />
                       <Tooltip
-                        cursor={{ stroke: "#cbd5e1", strokeDasharray: "4 4" }}
+                        cursor={{ stroke: "var(--chart-quota)", strokeDasharray: "4 4" }}
                         contentStyle={{
                           borderRadius: "18px",
-                          border: "1px solid rgba(148, 163, 184, 0.2)",
-                          background: "rgba(15, 23, 42, 0.92)",
-                          color: "#f8fafc"
+                          border: "1px solid var(--chart-tooltip-border)",
+                          background: "var(--chart-tooltip-bg)",
+                          color: "var(--chart-tooltip-fg)"
                         }}
                         formatter={(value, name, entry) => {
                           if (name === "quota") return [formatTHB(Number(value ?? 0)), copy.dailyQuotaSeries];
@@ -686,9 +687,9 @@ export function DashboardPage() {
                         }}
                         labelFormatter={(label) => `${copy.dailyQuotaChart}: ${label}`}
                       />
-                      <Line type="monotone" dataKey="spent" stroke="#14b8a6" strokeWidth={3.5} dot={false} activeDot={{ r: 5, strokeWidth: 0 }} name="spent" />
-                      <Line type="monotone" dataKey="quota" stroke="#94a3b8" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} name="quota" />
-                      <Line type="monotone" dataKey="average" stroke="#06b6d4" strokeWidth={2.5} strokeDasharray="6 6" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} name="average" />
+                      <Line type="monotone" dataKey="spent" stroke="var(--chart-spent)" strokeWidth={3.5} dot={false} activeDot={{ r: 5, strokeWidth: 0 }} name="spent" />
+                      <Line type="monotone" dataKey="quota" stroke="var(--chart-quota)" strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} name="quota" />
+                      <Line type="monotone" dataKey="average" stroke="var(--chart-average)" strokeWidth={2.5} strokeDasharray="6 6" dot={false} activeDot={{ r: 4, strokeWidth: 0 }} name="average" />
                     </LineChart>
                   </ResponsiveContainer>
                 ) : null}
@@ -702,12 +703,12 @@ export function DashboardPage() {
         <Link href={monthlySummaryLink.href} className="block">
           <Card className="h-full transition hover:-translate-y-0.5 hover:shadow-lg">
             <div className="flex items-start gap-4">
-              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300">
+              <div className={["grid h-11 w-11 place-items-center rounded-2xl", accentSoftBgClass, accentTextClass].join(" ")}>
                 <MonthlySummaryIcon className="h-5 w-5" />
               </div>
               <div>
                 <h2 className="text-lg font-bold">{monthlySummaryLink.title}</h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{monthlySummaryLink.description}</p>
+                <p className={["mt-1 text-sm", mutedTextClass].join(" ")}>{monthlySummaryLink.description}</p>
               </div>
             </div>
           </Card>
@@ -749,15 +750,15 @@ export function DashboardPage() {
           <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
             <div>
               <h2 className="text-lg font-bold">{copy.monthlyExpenses}</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{copy.monthlyExpensesHint}</p>
+              <p className={["mt-1 text-sm", mutedTextClass].join(" ")}>{copy.monthlyExpensesHint}</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
               <span className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-teal-500" />
+                <span className="h-3 w-3 rounded-full bg-[var(--chart-spent)]" />
                 {copy.monthlyFood}
               </span>
               <span className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-cyan-200" />
+                <span className="h-3 w-3 rounded-full bg-[var(--chart-other)]" />
                 {copy.monthlyOther}
               </span>
             </div>
@@ -772,9 +773,15 @@ export function DashboardPage() {
                     cursor={false}
                     formatter={(value, name) => [formatTHB(Number(value ?? 0)), name === "food" ? copy.monthlyFood : copy.monthlyOther]}
                     labelFormatter={(label) => `${copy.monthlyExpenses}: ${label}`}
+                    contentStyle={{
+                      borderRadius: "18px",
+                      border: "1px solid var(--chart-tooltip-border)",
+                      background: "var(--chart-tooltip-bg)",
+                      color: "var(--chart-tooltip-fg)"
+                    }}
                   />
-                  <Bar dataKey="food" stackId="expenses" fill="#14b8a6" radius={[10, 10, 0, 0]} />
-                  <Bar dataKey="other" stackId="expenses" fill="#bae6fd" radius={[10, 10, 0, 0]} />
+                  <Bar dataKey="food" stackId="expenses" fill="var(--chart-spent)" radius={[10, 10, 0, 0]} />
+                  <Bar dataKey="other" stackId="expenses" fill="var(--chart-other)" radius={[10, 10, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : null}
@@ -793,11 +800,11 @@ export function DashboardPage() {
               .slice()
               .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
               .map((transaction) => (
-              <div key={transaction.id} className="flex min-w-0 items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 dark:bg-white/5">
+              <div key={transaction.id} className={["flex min-w-0 items-center justify-between gap-3 rounded-2xl px-3 py-2", panelSoftClass].join(" ")}>
                 <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-                  <span className="shrink-0 text-slate-500 dark:text-slate-400">{formatShortDate(transaction.date)}</span>
+                  <span className={["shrink-0", mutedTextClass].join(" ")}>{formatShortDate(transaction.date)}</span>
                   <span className="truncate font-semibold">{transaction.title}</span>
-                  <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">{transaction.transactionType}</span>
+                  <span className={["shrink-0 text-xs", mutedTextClass].join(" ")}>{transaction.transactionType}</span>
                 </div>
                 <p className="shrink-0 text-sm font-bold">{formatTHB(transaction.amount)}</p>
               </div>
