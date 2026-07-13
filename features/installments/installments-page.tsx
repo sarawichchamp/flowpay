@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Pencil, Repeat, Trash2, X } from "lucide-react";
+import { Loader2, Pencil, Repeat, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -30,6 +30,7 @@ function installmentsCopy(locale: "th" | "en") {
         updateFailed: "แก้ไขรายการผ่อนไม่สำเร็จ",
         deleteFailed: "ลบรายการผ่อนไม่สำเร็จ",
         deleteConfirm: "ลบรายการผ่อนนี้ใช่ไหม",
+        saving: "กำลังบันทึก...",
         edit: "แก้ไข",
         delete: "ลบ",
         cancelEdit: "ยกเลิกการแก้ไข",
@@ -44,6 +45,7 @@ function installmentsCopy(locale: "th" | "en") {
         updateFailed: "Failed to update installment",
         deleteFailed: "Failed to delete installment",
         deleteConfirm: "Delete this installment?",
+        saving: "Saving...",
         edit: "Edit",
         delete: "Delete",
         cancelEdit: "Cancel edit",
@@ -243,9 +245,11 @@ export function InstallmentsPage() {
               <span className="hidden sm:block" />
             )}
             <Button type="submit" size="sm" className="h-7 w-full whitespace-nowrap px-2 text-[11px]" disabled={isSaving}>
-              {editingInstallmentId ? copy.update : t(locale, "save")}
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isSaving ? copy.saving : editingInstallmentId ? copy.update : t(locale, "save")}
             </Button>
           </div>
+          {isSaving ? <p className="text-sm text-teal-600 dark:text-teal-300">{copy.saving}</p> : null}
           {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
         </form>
       </Card>

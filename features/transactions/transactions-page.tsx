@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Camera, ExternalLink, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
+import { Camera, ExternalLink, Loader2, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
@@ -50,6 +50,7 @@ function transactionsCopy(locale: "th" | "en") {
         addRow: "เพิ่มแถว",
         removeRow: "ลบแถว",
         saveAll: "บันทึกทั้งหมด",
+        saving: "กำลังบันทึก...",
         edit: "แก้ไข",
         delete: "ลบ",
         cancelEdit: "ยกเลิกการแก้ไข",
@@ -74,6 +75,7 @@ function transactionsCopy(locale: "th" | "en") {
         addRow: "Add row",
         removeRow: "Remove row",
         saveAll: "Save all",
+        saving: "Saving...",
         edit: "Edit",
         delete: "Delete",
         cancelEdit: "Cancel edit",
@@ -593,14 +595,16 @@ export function TransactionsPage() {
             >
               {copy.reset}
             </Button>
-            <Button type="button" variant="secondary" size="sm" className="h-7 w-full whitespace-nowrap px-2 text-[11px]" onClick={addRow}>
+            <Button type="button" variant="secondary" size="sm" className="h-7 w-full whitespace-nowrap px-2 text-[11px]" onClick={addRow} disabled={isSaving}>
               <Plus className="h-4 w-4" />
               {copy.addRow}
             </Button>
             <Button type="submit" size="sm" disabled={isSaving} className="h-7 w-full whitespace-nowrap px-2 text-[10px] sm:text-[11px]">
-              {copy.saveAll}
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isSaving ? copy.saving : copy.saveAll}
             </Button>
           </div>
+          {isSaving ? <p className="text-sm text-teal-600 dark:text-teal-300">{copy.saving}</p> : null}
           {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
         </form>
       </Card>
@@ -707,10 +711,12 @@ export function TransactionsPage() {
                           {copy.cancelEdit}
                         </Button>
                         <Button type="submit" size="sm" className="h-7 px-2 text-[11px]" disabled={isSaving}>
-                          {copy.update}
+                          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                          {isSaving ? copy.saving : copy.update}
                         </Button>
                       </div>
                     </div>
+                    {isSaving ? <p className="text-sm text-teal-600 dark:text-teal-300">{copy.saving}</p> : null}
                     {submitError ? <p className="text-sm text-red-500">{submitError}</p> : null}
                   </motion.form>
                 ) : (
