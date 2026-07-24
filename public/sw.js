@@ -1,6 +1,6 @@
 /* global URL */
 
-const CACHE_NAME = "flowpay-v3";
+const CACHE_NAME = "flowpay-v4";
 const OFFLINE_URLS = ["/", "/manifest.webmanifest"];
 const STATIC_DESTINATIONS = new Set(["style", "script", "font", "image"]);
 
@@ -72,8 +72,8 @@ self.addEventListener("push", (event) => {
       body,
       tag,
       data: { url },
-      badge: "/icons/icon-192.svg",
-      icon: "/icons/icon-192.svg"
+      badge: "/icons/notification-icon.png",
+      icon: "/icons/notification-icon.png"
     })
   );
 });

@@ -3,6 +3,7 @@ import { FlowPayRepository } from "@/repositories/flowpay-repository";
 import { getAppMode } from "@/services/flowpay/app-mode";
 import { defaultCarryOverAmount, defaultFoodBudgetTarget, householdPayrollDay } from "@/services/flowpay/config";
 import { getConfiguredHouseholdMembers } from "@/services/flowpay/household-members";
+import { ensureInstallmentTransactionsForCycle } from "@/services/installments/ensure-cycle-installment-transactions";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/services/supabase/admin";
 import type { FlowPayBootstrap } from "@/types/flowpay-store";
 import { getBillingCycleFromPayrollDate } from "@/utils/billing-cycle";
@@ -113,6 +114,11 @@ async function ensureHouseholdSetup(repository: FlowPayRepository) {
     }
 
     activeCycle = await repository.getCurrentBillingCycle();
+
+    if (activeCycle) {
+      const activeInstallments = await repository.getActiveInstallments();
+      await ensureInstallmentTransactionsForCycle(supabase, activeCycle, activeInstallments);
+    }
   }
 }
 
@@ -167,6 +173,11 @@ export async function getFlowPayBootstrap(): Promise<FlowPayBootstrap> {
     }
 
     const installmentRows = await repository.getActiveInstallments();
+
+    // Keep the current cycle self-healing in case it was created before
+    // installment transactions could be generated.
+    await ensureInstallmentTransactionsForCycle(supabase, cycle, installmentRows);
+
     const cycleTransactions = await repository.getTransactionsForCycle(cycle.id);
 
     return {
