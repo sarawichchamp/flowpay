@@ -766,6 +766,28 @@ textarea {
   font: inherit;
 }
 
+/* iOS Safari gives native date controls an intrinsic width that can overflow
+   narrow grid columns. Removing the native appearance lets the input obey the
+   grid track while keeping the platform date picker available on tap. */
+input[type="date"] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+}
+
 ::selection {
   background: #2dd4bf;
   color: #07111f;
