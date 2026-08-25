@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { z } from "zod";
 import { findCategoryIdByAlias } from "@/repositories/category-helpers";
 import { requireHouseholdApiAccess } from "@/services/flowpay/api-access";
-import { ensureBillingCycleExists, getHouseholdProfileIds } from "@/services/flowpay/request-validation";
+import { ensureBillingCycleContainsDate, getHouseholdProfileIds } from "@/services/flowpay/request-validation";
 import { dispatchPushNotificationsForTransactions } from "@/services/notifications/dispatch-push";
 import { createAdminClient } from "@/services/supabase/admin";
 import type { Transaction } from "@/types/domain";
@@ -46,18 +46,22 @@ async function validateTransactionReferences(
   supabase: ReturnType<typeof createAdminClient>,
   input: TransactionWriteInput,
   householdProfileIds: Set<string>,
-  knownCycleIds: Map<string, boolean>
+  knownCycleDates: Map<string, boolean>
 ) {
   if (!householdProfileIds.has(input.payerUserId)) {
     return NextResponse.json({ error: "Invalid payer" }, { status: 400 });
   }
 
-  if (!knownCycleIds.has(input.billingCycleId)) {
-    knownCycleIds.set(input.billingCycleId, await ensureBillingCycleExists(supabase, input.billingCycleId));
+  const cycleDateKey = `${input.billingCycleId}:${input.date}`;
+  if (!knownCycleDates.has(cycleDateKey)) {
+    knownCycleDates.set(
+      cycleDateKey,
+      await ensureBillingCycleContainsDate(supabase, input.billingCycleId, input.date)
+    );
   }
 
-  if (!knownCycleIds.get(input.billingCycleId)) {
-    return NextResponse.json({ error: "Invalid billing cycle" }, { status: 400 });
+  if (!knownCycleDates.get(cycleDateKey)) {
+    return NextResponse.json({ error: "Transaction date is outside the selected billing cycle" }, { status: 400 });
   }
 
   const resolvedCategoryId = await findCategoryIdByAlias(supabase, input.categoryId);
@@ -105,10 +109,10 @@ export async function POST(request: Request) {
   const inputs = "transactions" in parsed.data ? parsed.data.transactions : [parsed.data];
   const createdTransactions: Transaction[] = [];
   const householdProfileIds = await getHouseholdProfileIds(supabase);
-  const knownCycleIds = new Map<string, boolean>();
+  const knownCycleDates = new Map<string, boolean>();
 
   for (const input of inputs) {
-    const validation = await validateTransactionReferences(supabase, input, householdProfileIds, knownCycleIds);
+    const validation = await validateTransactionReferences(supabase, input, householdProfileIds, knownCycleDates);
     if (validation instanceof NextResponse) {
       return validation;
     }

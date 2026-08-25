@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Scale } from "lucide-react";
+import { ArrowLeft, ArrowRight, Pencil, Save, Scale, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
 import { t, type DictionaryKey } from "@/i18n/dictionary";
 import { createClient } from "@/services/supabase/browser";
-import type { Profile } from "@/types/domain";
+import type { Profile, SplitType, Transaction, TransactionType } from "@/types/domain";
 import { getCategoryLabel } from "@/utils/categories";
 import { cn } from "@/utils/cn";
 import { formatTHB } from "@/utils/currency";
@@ -80,6 +83,24 @@ function detailCopy(locale: "th" | "en") {
       };
 }
 
+function editorCopy(locale: "th" | "en") {
+  return locale === "th"
+    ? { title: "รายการในสรุปยอดนี้", edit: "แก้ไข", cancel: "ยกเลิก", save: "บันทึกการแก้ไข", paidBy: "จ่ายโดย", type: "ประเภทรายการ", split: "การหาร", food: "อาหาร", normal: "ทั่วไป", splitHalf: "หารครึ่ง", noSplit: "ไม่หาร", fullReimburse: "คืนเต็มจำนวน", installmentLocked: "รายการผ่อนให้แก้ไขจากหน้าผ่อนชำระ", updateFailed: "แก้ไขรายการไม่สำเร็จ" }
+    : { title: "Transactions in this summary", edit: "Edit", cancel: "Cancel", save: "Save changes", paidBy: "Paid by", type: "Transaction type", split: "Split", food: "Food", normal: "General", splitHalf: "Split half", noSplit: "No split", fullReimburse: "Full reimbursement", installmentLocked: "Edit installment entries from the Installments page", updateFailed: "Failed to update transaction" };
+}
+
+function getTransactionTypeLabel(locale: "th" | "en", transactionType: TransactionType) {
+  if (transactionType === "food") return locale === "th" ? "ค่าอาหาร" : "Food";
+  if (transactionType === "installment") return locale === "th" ? "ผ่อนชำระ" : "Installment";
+  return locale === "th" ? "ค่าใช้จ่ายอื่น" : "Other expense";
+}
+
+function getSplitTypeLabel(locale: "th" | "en", splitType: SplitType) {
+  if (splitType === "split_half") return locale === "th" ? "หารครึ่ง" : "Split half";
+  if (splitType === "full_reimburse") return locale === "th" ? "คืนเต็มจำนวน" : "Full reimbursement";
+  return locale === "th" ? "ไม่หาร" : "No split";
+}
+
 function LedgerList({
   locale,
   title,
@@ -133,10 +154,15 @@ export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
   const router = useRouter();
   const { locale } = useLocale();
   const copy = detailCopy(locale);
+  const editCopy = editorCopy(locale);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [summary, setSummary] = useState<SummaryRow | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState<Transaction | null>(null);
+  const [editDraft, setEditDraft] = useState({ title: "", date: "", amount: "", payerUserId: "", transactionType: "normal" as TransactionType, splitType: "split_half" as SplitType });
+  const [saving, setSaving] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -189,7 +215,56 @@ export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
       cancelled = true;
       void supabase.removeChannel(channel);
     };
-  }, [copy.loadFailed, cycleStart, router]);
+  }, [copy.loadFailed, cycleStart, refreshToken, router]);
+
+  function startEditing(transaction: Transaction) {
+    if (transaction.installmentId) return;
+    setEditing(transaction);
+    setEditDraft({
+      title: transaction.title,
+      date: transaction.date,
+      amount: String(transaction.amount),
+      payerUserId: transaction.payerUserId,
+      transactionType: transaction.transactionType,
+      splitType: transaction.transactionType === "food" ? "no_split" : transaction.splitType
+    });
+    setError("");
+  }
+
+  async function saveTransaction() {
+    if (!editing || !selectedSummary) return;
+    const amount = Number(editDraft.amount);
+    if (!editDraft.title.trim() || !Number.isFinite(amount) || amount <= 0) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editing.id,
+          billingCycleId: selectedSummary.cycle.id,
+          date: editDraft.date,
+          title: editDraft.title,
+          categoryId: editDraft.transactionType === "food" ? "food" : editing.categoryId,
+          amount,
+          payerUserId: editDraft.payerUserId,
+          transactionType: editDraft.transactionType,
+          splitType: editDraft.transactionType === "food" ? "no_split" : editDraft.splitType,
+          note: editing.note,
+          attachmentUrl: editing.attachmentUrl
+        })
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error ?? editCopy.updateFailed);
+      setEditing(null);
+      setRefreshToken((value) => value + 1);
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : editCopy.updateFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const selectedSummary = useMemo(() => summary, [summary]);
 
@@ -307,6 +382,79 @@ export function SettlementDetailPage({ cycleStart }: { cycleStart: string }) {
           lines={bToAItems}
         />
       </section>
+
+      <Card className="p-4">
+        <h2 className="text-lg font-black">{editCopy.title}</h2>
+        <div className="mt-3 space-y-2">
+          {selectedSummary.transactions.map((transaction) => {
+            const isEditing = editing?.id === transaction.id;
+            if (isEditing) {
+              return (
+                <div key={transaction.id} className="space-y-3 rounded-2xl bg-slate-50 p-3 dark:bg-white/5">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2">
+                      <Field label={t(locale, "title")}>
+                        <Input value={editDraft.title} onChange={(event) => setEditDraft((value) => ({ ...value, title: event.target.value }))} />
+                      </Field>
+                    </div>
+                    <Field label={t(locale, "date")}>
+                      <Input type="date" min={selectedSummary.cycle.startDate} max={selectedSummary.cycle.endDate} value={editDraft.date} onChange={(event) => setEditDraft((value) => ({ ...value, date: event.target.value }))} />
+                    </Field>
+                    <Field label={t(locale, "amount")}>
+                      <Input type="number" min="0.01" step="0.01" value={editDraft.amount} onChange={(event) => setEditDraft((value) => ({ ...value, amount: event.target.value }))} />
+                    </Field>
+                  </div>
+                  <Field label={editCopy.paidBy}>
+                    <div className="flex flex-wrap gap-2">
+                      {profiles.map((profile) => <Button key={profile.id} type="button" size="sm" variant={editDraft.payerUserId === profile.id ? "primary" : "secondary"} onClick={() => setEditDraft((value) => ({ ...value, payerUserId: profile.id }))}>{profile.displayName}</Button>)}
+                    </div>
+                  </Field>
+                  <Field label={editCopy.type}>
+                    <div className="flex flex-wrap gap-2">
+                      {(["food", "normal"] as TransactionType[]).map((type) => <Button key={type} type="button" size="sm" variant={editDraft.transactionType === type ? "primary" : "secondary"} onClick={() => setEditDraft((value) => ({ ...value, transactionType: type, splitType: type === "food" ? "no_split" : value.splitType }))}>{type === "food" ? editCopy.food : editCopy.normal}</Button>)}
+                    </div>
+                  </Field>
+                  {editDraft.transactionType !== "food" ? (
+                    <Field label={editCopy.split}>
+                      <div className="flex flex-wrap gap-2">
+                        {(["split_half", "no_split", "full_reimburse"] as SplitType[]).map((split) => <Button key={split} type="button" size="sm" variant={editDraft.splitType === split ? "primary" : "secondary"} onClick={() => setEditDraft((value) => ({ ...value, splitType: split }))}>{split === "split_half" ? editCopy.splitHalf : split === "no_split" ? editCopy.noSplit : editCopy.fullReimburse}</Button>)}
+                      </div>
+                    </Field>
+                  ) : null}
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="secondary" onClick={() => setEditing(null)}><X className="h-4 w-4" />{editCopy.cancel}</Button>
+                    <Button type="button" disabled={saving} onClick={() => void saveTransaction()}><Save className="h-4 w-4" />{editCopy.save}</Button>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div key={transaction.id} className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_auto] items-center gap-2 rounded-xl bg-[var(--panel-soft-bg)] px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{transaction.title}</p>
+                  <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{formatDetailDate(locale, transaction.date)}</p>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Badge className={cn("px-2 py-0.5 text-[11px]", transaction.transactionType === "food" ? "bg-[var(--accent-soft)] text-[var(--accent-fg)]" : undefined)}>
+                      {getTransactionTypeLabel(locale, transaction.transactionType)}
+                    </Badge>
+                    <Badge className="px-2 py-0.5 text-[11px]">{getSplitTypeLabel(locale, transaction.splitType)}</Badge>
+                  </div>
+                  <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
+                    {editCopy.paidBy}: {profiles.find((profile) => profile.id === transaction.payerUserId)?.displayName ?? "-"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <p className="whitespace-nowrap text-sm font-black">{formatTHB(transaction.amount)}</p>
+                  {transaction.installmentId ? <span className="px-2 text-xs text-slate-400" title={editCopy.installmentLocked}>🔒</span> : <Button type="button" size="icon" variant="ghost" className="h-8 w-8 rounded-xl" onClick={() => startEditing(transaction)} aria-label={`${editCopy.edit} ${transaction.title}`}><Pencil className="h-4 w-4" /></Button>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
     </div>
   );
 }

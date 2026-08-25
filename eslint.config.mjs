@@ -1,4 +1,4 @@
-import tseslint from "./node_modules/.pnpm/node_modules/typescript-eslint/dist/index.js";
+import tseslint from "typescript-eslint";
 
 const eslintConfig = [
   ...tseslint.configs.recommended,

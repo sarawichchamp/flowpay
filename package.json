@@ -23,7 +23,7 @@
     "date-fns": "latest",
     "framer-motion": "latest",
     "lucide-react": "latest",
-    "next": "latest",
+    "next": "^16.3.2",
     "next-themes": "latest",
     "react": "latest",
     "react-dom": "latest",
@@ -32,7 +32,7 @@
     "tailwind-merge": "latest",
     "tesseract.js": "latest",
     "web-push": "^3.6.7",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "latest"
   },
   "devDependencies": {
@@ -41,7 +41,7 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "eslint": "latest",
-    "eslint-config-next": "latest",
+    "eslint-config-next": "^16.3.2",
     "tailwindcss": "latest",
     "typescript": "latest"
   }

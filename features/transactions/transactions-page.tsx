@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useFlowPayStore } from "@/hooks/use-flowpay-store";
 import { useLocale } from "@/hooks/use-locale";
 import { t } from "@/i18n/dictionary";
-import type { SplitType, Transaction, TransactionType, TransactionTypePreset } from "@/types/domain";
+import type { BillingCycle, SplitType, Transaction, TransactionType, TransactionTypePreset } from "@/types/domain";
 import { cn } from "@/utils/cn";
 import { formatTHB } from "@/utils/currency";
 import { formatShortDate, getCurrentDateStringInTimeZone } from "@/utils/date";
@@ -120,6 +120,13 @@ function getAttachmentName(attachmentUrl?: string | null) {
   } catch {
     return lastSegment;
   }
+}
+
+function formatCycleMonth(locale: "th" | "en", cycle: BillingCycle) {
+  return new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
+    month: "long",
+    year: "numeric"
+  }).format(new Date(`${cycle.startDate}T00:00:00`));
 }
 
 function getDefaultPresetId(transactionTypePresets: TransactionTypePreset[], baseType: "food" | "normal" = "food") {
@@ -273,10 +280,33 @@ export function TransactionsPage() {
   const [sortBy, setSortBy] = useState<TransactionSortKey>("createdAt");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
+  const [availableCycles, setAvailableCycles] = useState<BillingCycle[]>([currentCycle]);
 
   useEffect(() => {
     setDrafts((current) => (current.length ? current : [createDraftTransaction(users[0].id, transactionTypePresets)]));
   }, [transactionTypePresets, users]);
+
+  useEffect(() => {
+    setAvailableCycles((current) => {
+      const next = current.filter((cycle) => cycle.id !== currentCycle.id);
+      return [currentCycle, ...next];
+    });
+
+    if (mode !== "production") return;
+    let cancelled = false;
+    void fetch("/api/monthly-summary")
+      .then((response) => response.json())
+      .then((payload: { summaries?: Array<{ cycle: BillingCycle }> }) => {
+        if (!cancelled && payload.summaries?.length) {
+          setAvailableCycles(payload.summaries.map((summary) => summary.cycle));
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentCycle, mode]);
 
   useEffect(() => {
     if (!previewAttachmentUrl) return;
@@ -426,6 +456,25 @@ export function TransactionsPage() {
     });
   }
 
+  function findCycleForDate(date: string) {
+    return availableCycles.find((cycle) => date >= cycle.startDate && date <= cycle.endDate);
+  }
+
+  function confirmCycleAssignments(assignments: Array<{ cycle: BillingCycle }>) {
+    const counts = new Map<string, { cycle: BillingCycle; count: number }>();
+    assignments.forEach(({ cycle }) => {
+      const existing = counts.get(cycle.id);
+      counts.set(cycle.id, { cycle, count: (existing?.count ?? 0) + 1 });
+    });
+    const details = [...counts.values()]
+      .map(({ cycle, count }) => `${formatCycleMonth(locale, cycle)} (${formatShortDate(cycle.startDate)} - ${formatShortDate(cycle.endDate)}): ${count}`)
+      .join("\n");
+    const message = locale === "th"
+      ? `ข้อมูลจะเข้าไปอยู่ในสรุปยอดดังนี้\n\n${details}\n\nยืนยันการบันทึกหรือไม่?`
+      : `These entries will be included in the following summaries:\n\n${details}\n\nConfirm save?`;
+    return window.confirm(message);
+  }
+
   async function handleBatchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitError("");
@@ -433,11 +482,20 @@ export function TransactionsPage() {
     const validDrafts = drafts.filter((draft) => draft.title.trim() && Number(draft.amount) > 0);
     if (!validDrafts.length) return;
 
+    const assignments = validDrafts.map((draft) => ({ draft, cycle: findCycleForDate(draft.date) }));
+    const unmatched = assignments.find((assignment) => !assignment.cycle);
+    if (unmatched) {
+      setSubmitError(locale === "th" ? `ไม่พบรอบสรุปยอดที่ครอบคลุมวันที่ ${formatShortDate(unmatched.draft.date)}` : `No summary cycle covers ${formatShortDate(unmatched.draft.date)}`);
+      return;
+    }
+    const resolvedAssignments = assignments as Array<{ draft: DraftTransaction; cycle: BillingCycle }>;
+    if (!confirmCycleAssignments(resolvedAssignments)) return;
+
     try {
       setIsSaving(true);
       const payloads = await Promise.all(
-        validDrafts.map(async (draft) => ({
-          billingCycleId: currentCycle.id,
+        resolvedAssignments.map(async ({ draft, cycle }) => ({
+          billingCycleId: cycle.id,
           title: draft.title,
           date: draft.date,
           amount: Number(draft.amount),
@@ -465,11 +523,17 @@ export function TransactionsPage() {
 
     const parsedAmount = Number(editDraft.amount);
     if (!editDraft.title.trim() || !Number.isFinite(parsedAmount) || parsedAmount <= 0) return;
+    const targetCycle = findCycleForDate(editDraft.date);
+    if (!targetCycle) {
+      setSubmitError(locale === "th" ? `ไม่พบรอบสรุปยอดที่ครอบคลุมวันที่ ${formatShortDate(editDraft.date)}` : `No summary cycle covers ${formatShortDate(editDraft.date)}`);
+      return;
+    }
+    if (!confirmCycleAssignments([{ cycle: targetCycle }])) return;
 
     try {
       setIsSaving(true);
       await updateTransaction(editingTransactionId, {
-        billingCycleId: currentCycle.id,
+        billingCycleId: targetCycle.id,
         title: editDraft.title,
         date: editDraft.date,
         amount: parsedAmount,

@@ -1,4 +1,4 @@
-import type { BillingCycle, SettlementResult } from "@/types/domain";
+import type { BillingCycle, SettlementResult, Transaction } from "@/types/domain";
 
 export type DetailedLedgerLine = SettlementResult["ledger"][number] & {
   title: string;
@@ -13,6 +13,7 @@ export type DetailedLedgerLine = SettlementResult["ledger"][number] & {
 
 export type SummaryRow = {
   cycle: BillingCycle;
+  transactions: Transaction[];
   transactionCount: number;
   installmentCount: number;
   expenseBreakdown: {

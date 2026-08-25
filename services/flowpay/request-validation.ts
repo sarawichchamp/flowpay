@@ -38,3 +38,18 @@ export async function ensureBillingCycleExists(supabase: SupabaseClient<Database
   if (error) throw error;
   return Boolean(data);
 }
+
+export async function ensureBillingCycleContainsDate(
+  supabase: SupabaseClient<Database>,
+  billingCycleId: string,
+  date: string
+) {
+  const { data, error } = await supabase
+    .from("billing_cycles")
+    .select("start_date,end_date")
+    .eq("id", billingCycleId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data && date >= data.start_date && date <= data.end_date);
+}

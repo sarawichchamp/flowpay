@@ -51,6 +51,7 @@ export async function GET(request: Request) {
 
       return {
         cycle,
+        transactions: cycleTransactions,
         transactionCount: cycleTransactions.length,
         installmentCount: cycleTransactions.filter((transaction) => transaction.transactionType === "installment").length,
         expenseBreakdown: {

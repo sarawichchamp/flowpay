@@ -57,13 +57,13 @@ export function findCategoryIdByAliasSpec(categories, alias) {
   return matched?.id ?? categories[0]?.id ?? null;
 }
 
-export function validateTransactionInputSpec({ input, resolvedCategoryId, foodCategoryId, householdProfileIds, cycleExists }) {
+export function validateTransactionInputSpec({ input, resolvedCategoryId, foodCategoryId, householdProfileIds, cycleContainsDate }) {
   if (!householdProfileIds.has(input.payerUserId)) {
     return "Invalid payer";
   }
 
-  if (!cycleExists) {
-    return "Invalid billing cycle";
+  if (!cycleContainsDate) {
+    return "Transaction date is outside the selected billing cycle";
   }
 
   if (!resolvedCategoryId) {
@@ -195,7 +195,7 @@ export const businessRuleCases = [
         resolvedCategoryId: "cat-other-1",
         foodCategoryId: "cat-food-1",
         householdProfileIds: new Set(["user-a", "user-b"]),
-        cycleExists: true
+        cycleContainsDate: true
       });
 
       assert.equal(error, "Food transactions must use the food category", "food category rule");
@@ -209,10 +209,24 @@ export const businessRuleCases = [
         resolvedCategoryId: "cat-food-1",
         foodCategoryId: "cat-food-1",
         householdProfileIds: new Set(["user-a", "user-b"]),
-        cycleExists: true
+        cycleContainsDate: true
       });
 
       assert.equal(error, "Food transactions must use no_split", "food split rule");
+    }
+  },
+  {
+    name: "transaction rejects a date outside its billing cycle",
+    run(assert) {
+      const error = validateTransactionInputSpec({
+        input: baseTransactionInput,
+        resolvedCategoryId: "cat-food-1",
+        foodCategoryId: "cat-food-1",
+        householdProfileIds: new Set(["user-a", "user-b"]),
+        cycleContainsDate: false
+      });
+
+      assert.equal(error, "Transaction date is outside the selected billing cycle", "transaction cycle date rule");
     }
   },
   {
